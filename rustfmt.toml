@@ -1,0 +1,31 @@
+# Rust formatting configuration
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Default"
+
+# Import organization
+reorder_imports = true
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+
+# Code style
+fn_args_layout = "Tall"
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+trailing_comma = "Vertical"
+match_arm_trailing_comma = true
+trailing_semicolon = true
+
+# Comments and documentation
+wrap_comments = true
+comment_width = 80
+normalize_comments = true
+normalize_doc_attributes = true
+
+# Misc
+remove_nested_parens = true
+use_field_init_shorthand = true
+force_explicit_abi = true

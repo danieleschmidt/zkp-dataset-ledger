@@ -1,0 +1,25 @@
+# Clippy configuration for ZKP Dataset Ledger
+# Stricter linting for cryptographic code
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 25
+
+# Documentation requirements
+missing-docs-in-crate-items = true
+
+# Arithmetic operations (important for crypto)
+integer-arithmetic = "deny"
+
+# String/literal limits
+literal-representation-threshold = 10
+single-char-lifetime-names = false
+
+# Enum variant names
+enum-variant-names-threshold = 3
+
+# Function parameter limits
+too-many-arguments-threshold = 7
+type-complexity-threshold = 250
+
+# Avoid certain constructs in crypto code
+avoid-breaking-exported-api = true
