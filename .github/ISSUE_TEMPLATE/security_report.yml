@@ -1,0 +1,76 @@
+name: Security Vulnerability Report
+description: Report a security vulnerability (for non-critical issues only)
+title: "[Security]: "
+labels: ["security", "triage"]
+assignees:
+  - danieleschmidt
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Important**: For critical security vulnerabilities, please email security@zkp-dataset-ledger.org instead of using this form.
+        
+        This form is for non-critical security improvements and minor security issues only.
+        
+  - type: checkboxes
+    id: severity
+    attributes:
+      label: Severity Assessment
+      description: Please confirm this is a non-critical security issue
+      options:
+        - label: This is NOT a critical vulnerability that could compromise user data or system security
+          required: true
+        - label: I have read the SECURITY.md file and understand the responsible disclosure process
+          required: true
+          
+  - type: dropdown
+    id: category
+    attributes:
+      label: Security Category
+      description: What type of security issue is this?
+      options:
+        - Information Disclosure (minor)
+        - Input Validation
+        - Configuration Security
+        - Documentation Security
+        - Dependency Security
+        - Build Security
+        - Other
+    validations:
+      required: true
+      
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the security issue in detail
+      placeholder: Please provide a clear description of the security concern
+    validations:
+      required: true
+      
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: What is the potential impact of this issue?
+      placeholder: Describe the potential security impact
+    validations:
+      required: true
+      
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: Do you have suggestions for how to fix this issue?
+      placeholder: Describe potential solutions or mitigations
+      
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Relevant environment information
+      placeholder: |
+        - OS: 
+        - Version: 
+        - Configuration: 
+      render: markdown
