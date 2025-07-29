@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  zkp-ledger:
+    build: .
+    container_name: zkp-dataset-ledger
+    volumes:
+      - ledger_data:/data
+      - ./test-data:/input:ro
+    environment:
+      - RUST_LOG=info
+      - ZKP_LEDGER_PATH=/data
+    ports:
+      - "8080:8080"  # If adding web interface later
+    networks:
+      - zkp-network
+    restart: unless-stopped
+
+  # PostgreSQL for advanced storage backend
+  postgres:
+    image: postgres:15-alpine
+    container_name: zkp-postgres
+    environment:
+      POSTGRES_DB: zkp_ledger
+      POSTGRES_USER: zkpuser
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - zkp-network
+    restart: unless-stopped
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: zkp-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - zkp-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  ledger_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  zkp-network:
+    driver: bridge
