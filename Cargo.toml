@@ -1,0 +1,92 @@
+[package]
+name = "zkp-dataset-ledger"
+version = "0.1.0"
+edition = "2021"
+authors = ["Daniel Schmidt <daniel@terragon.ai>"]
+description = "A zero-knowledge-proof ledger that notarizes every dataset version, transformation, and train/eval split"
+repository = "https://github.com/yourusername/zkp-dataset-ledger"
+license = "MIT"
+keywords = ["zero-knowledge", "cryptography", "ml", "audit", "blockchain"]
+categories = ["cryptography", "science", "development-tools"]
+readme = "README.md"
+
+[dependencies]
+# Core ZK and cryptographic libraries
+ark-bls12-381 = "0.4"
+ark-groth16 = "0.4"
+ark-std = "0.4"
+ark-ff = "0.4"
+ark-ec = "0.4"
+ark-poly = "0.4"
+ark-relations = "0.4"
+ark-r1cs-std = "0.4"
+ark-crypto-primitives = "0.4"
+
+# Merkle tree and hashing
+merkletree = "0.23"
+sha3 = "0.10"
+blake3 = "1.5"
+
+# Serialization and data handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+csv = "1.3"
+polars = { version = "0.35", features = ["lazy", "csv-file", "json"] }
+
+# Storage backends
+rocksdb = { version = "0.21", optional = true }
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+# Async runtime and utilities
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# CLI and logging
+clap = { version = "4.0", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Benchmarking and testing
+criterion = { version = "0.5", optional = true }
+proptest = { version = "1.0", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.0"
+
+[features]
+default = ["rocksdb"]
+postgres = ["sqlx"]
+benchmarks = ["criterion"]
+property-testing = ["proptest"]
+
+[[bin]]
+name = "zkp-ledger"
+path = "src/bin/cli.rs"
+
+[[bench]]
+name = "proof_generation"
+harness = false
+required-features = ["benchmarks"]
+
+[[bench]]
+name = "verification"
+harness = false
+required-features = ["benchmarks"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+debug = true
