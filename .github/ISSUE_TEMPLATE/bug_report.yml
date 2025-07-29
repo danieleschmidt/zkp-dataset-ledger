@@ -1,0 +1,87 @@
+name: Bug Report
+description: File a bug report for ZKP Dataset Ledger
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees:
+  - danieleschmidt
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out this form as completely as possible.
+        
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of zkp-dataset-ledger are you running?
+      placeholder: ex. 0.1.0
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: What environment are you using?
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Docker
+        - Other
+    validations:
+      required: true
+      
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of what the bug is
+      placeholder: Tell us what went wrong!
+    validations:
+      required: true
+      
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+      placeholder: Describe the expected behavior
+    validations:
+      required: true
+      
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide step-by-step instructions to reproduce the issue
+      placeholder: |
+        1. Run `zkp-ledger init`
+        2. Execute `zkp-ledger notarize data.csv`
+        3. See error...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output (set RUST_LOG=debug)
+      render: shell
+      
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Please share your zkp-ledger.toml or command-line flags
+      render: toml
+      
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Security
+      description: By submitting this issue, you confirm that it doesn't contain sensitive information
+      options:
+        - label: This bug report does not contain sensitive cryptographic material or private keys
+          required: true

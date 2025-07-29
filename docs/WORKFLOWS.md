@@ -121,15 +121,32 @@ Configure on main branch:
 
 ## Manual Setup Instructions
 
-Since workflows cannot be automatically created, follow these steps:
+⚠️ **Note**: GitHub Actions workflows cannot be automatically created for security reasons.
+
+To set up CI/CD, repository maintainers should:
 
 1. Create `.github/workflows/` directory
 2. Copy the workflow templates from this documentation
-3. Adapt the templates to your specifig needs
+3. Adapt the templates to your specific needs
 4. Test workflows on a feature branch first
 5. Configure required secrets in repository settings
 6. Enable branch protection rules
 7. Set up external integrations (Codecov, etc.)
+
+### Pre-commit Setup
+
+The pre-commit configuration has been added to this repository. To enable:
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+
+# Run hooks manually
+pre-commit run --all-files
+```
 
 ## Monitoring and Alerts
 

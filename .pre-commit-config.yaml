@@ -1,0 +1,74 @@
+# Pre-commit configuration for ZKP Dataset Ledger
+# https://pre-commit.com/
+
+repos:
+  # Rust formatting and linting
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all --
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --all-features
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        
+      - id: cargo-audit
+        name: cargo audit
+        entry: cargo audit
+        language: system
+        files: '^Cargo\.(toml|lock)$'
+        pass_filenames: false
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(md|yml|yaml)$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+        
+  # Security checks
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.63.2
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        entry: trufflehog filesystem
+        language: system
+        pass_filenames: false
+        
+  # Markdown formatting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: ['--config', '.markdownlint.json']
+        
+# Configuration
+default_stages: [commit]
+fail_fast: true
+
+# Skip specific hooks for specific files
+# Example: SKIP=cargo-test git commit -m "docs update"

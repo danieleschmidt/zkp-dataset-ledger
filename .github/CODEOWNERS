@@ -1,0 +1,29 @@
+# Global ownership for ZKP Dataset Ledger
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for all files
+* @danieleschmidt
+
+# Core cryptographic code requires additional review
+/src/crypto/ @danieleschmidt
+/src/proof.rs @danieleschmidt
+
+# Security-sensitive files
+/SECURITY.md @danieleschmidt
+/Cargo.toml @danieleschmidt
+/.github/ @danieleschmidt
+
+# Documentation ownership
+/docs/ @danieleschmidt
+/README.md @danieleschmidt
+/CONTRIBUTING.md @danieleschmidt
+
+# Build and CI configuration
+/Makefile @danieleschmidt
+/Dockerfile @danieleschmidt
+/docker-compose.yml @danieleschmidt
+/.github/workflows/ @danieleschmidt
+
+# Test infrastructure
+/tests/ @danieleschmidt
+/benches/ @danieleschmidt
