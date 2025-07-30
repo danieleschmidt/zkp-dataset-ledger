@@ -1,0 +1,189 @@
+# Observability and Performance Monitoring Configuration
+# Used for telemetry, metrics, and monitoring setup
+
+[tracing]
+# Structured logging configuration
+default_level = "info"
+targets = [
+    { name = "zkp_dataset_ledger", level = "debug" },
+    { name = "zkp_dataset_ledger::crypto", level = "trace" },
+    { name = "zkp_dataset_ledger::ledger", level = "debug" },
+]
+
+# Output formats
+[tracing.formats]
+console = { pretty = true, with_target = true, with_thread_ids = false }
+json = { flatten_event = true, with_current_span = true }
+jaeger = { endpoint = "http://localhost:14268/api/traces" }
+
+# Performance tracking
+[metrics]
+# Prometheus metrics collection
+prometheus = { bind_addr = "127.0.0.1:9090", namespace = "zkp_dataset_ledger" }
+
+# Custom metrics to track
+[[metrics.counters]]
+name = "proofs_generated_total"
+description = "Total number of ZK proofs generated"
+labels = ["proof_type", "dataset_size_category"]
+
+[[metrics.counters]]
+name = "proofs_verified_total"
+description = "Total number of ZK proofs verified"
+labels = ["proof_type", "verification_result"]
+
+[[metrics.counters]]
+name = "ledger_operations_total"
+description = "Total ledger operations performed"
+labels = ["operation_type", "status"]
+
+[[metrics.histograms]]
+name = "proof_generation_duration_seconds"
+description = "Time taken to generate ZK proofs"
+buckets = [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 300.0]
+labels = ["proof_type", "dataset_size_category"]
+
+[[metrics.histograms]]
+name = "proof_verification_duration_seconds"
+description = "Time taken to verify ZK proofs"
+buckets = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+labels = ["proof_type"]
+
+[[metrics.histograms]]
+name = "dataset_processing_duration_seconds"
+description = "Time taken to process datasets"
+buckets = [0.1, 1.0, 10.0, 60.0, 300.0, 900.0]
+labels = ["operation", "dataset_size_category"]
+
+[[metrics.gauges]]
+name = "active_ledger_connections"
+description = "Number of active ledger connections"
+
+[[metrics.gauges]]
+name = "memory_usage_bytes"
+description = "Memory usage in bytes"
+labels = ["component"]
+
+# Alerting rules
+[alerting]
+# Performance degradation alerts
+[[alerting.rules]]
+name = "proof_generation_slow"
+description = "ZK proof generation taking longer than expected"
+condition = "proof_generation_duration_seconds.p95 > 10.0"
+severity = "warning"
+for_duration = "5m"
+
+[[alerting.rules]]
+name = "proof_verification_slow"
+description = "ZK proof verification taking longer than expected"
+condition = "proof_verification_duration_seconds.p95 > 0.1"
+severity = "warning"
+for_duration = "2m"
+
+[[alerting.rules]]
+name = "high_memory_usage"
+description = "Memory usage is approaching limits"
+condition = "memory_usage_bytes > 0.8 * memory_limit_bytes"
+severity = "critical"
+for_duration = "1m"
+
+# Error rate monitoring
+[[alerting.rules]]
+name = "high_proof_failure_rate"
+description = "High rate of proof generation failures"
+condition = "rate(proofs_generated_total{status='failed'}[5m]) > 0.1"
+severity = "critical"
+for_duration = "2m"
+
+# Health check configuration
+[health]
+# Endpoint configuration
+bind_addr = "127.0.0.1:8080"
+path = "/health"
+
+# Health checks to perform
+[[health.checks]]
+name = "database_connection"
+type = "database"
+timeout = "5s"
+interval = "30s"
+
+[[health.checks]]
+name = "crypto_operations"
+type = "custom"
+command = "zkp-ledger test-crypto"
+timeout = "10s"
+interval = "60s"
+
+[[health.checks]]
+name = "disk_space"
+type = "disk"
+path = "./ledger-data"
+min_free_gb = 1.0
+interval = "60s"
+
+# Profiling configuration
+[profiling]
+# CPU profiling
+cpu = { enabled = false, sample_rate = 100 }
+
+# Memory profiling
+memory = { enabled = false, sample_rate = 1024 }
+
+# Enable profiling in development
+[profiling.dev]
+cpu = { enabled = true, sample_rate = 10 }
+memory = { enabled = true, sample_rate = 256 }
+
+# Performance benchmarking
+[benchmarking]
+# Automated performance regression testing
+regression_threshold = 0.1  # 10% degradation threshold
+baseline_comparison = true
+store_results = true
+results_dir = "./benchmark-results"
+
+# Benchmark scenarios
+[[benchmarking.scenarios]]
+name = "small_dataset"
+description = "1K rows dataset operations"
+dataset_size = 1000
+operations = ["notarize", "transform", "verify"]
+
+[[benchmarking.scenarios]]
+name = "medium_dataset"
+description = "100K rows dataset operations"
+dataset_size = 100000
+operations = ["notarize", "transform", "verify"]
+
+[[benchmarking.scenarios]]
+name = "large_dataset"
+description = "1M rows dataset operations"
+dataset_size = 1000000
+operations = ["notarize", "verify"]  # Skip transform for large datasets
+
+# Resource monitoring
+[resources]
+# Resource limits and monitoring
+max_memory_mb = 4096
+max_cpu_usage_percent = 80
+max_disk_usage_gb = 50
+
+# Automatic cleanup policies
+[resources.cleanup]
+old_proofs_days = 30
+temp_files_hours = 24
+log_files_days = 7
+benchmark_results_days = 90
+
+# Integration endpoints
+[integrations]
+# Grafana dashboard configuration
+grafana = { url = "http://localhost:3000", api_key_env = "GRAFANA_API_KEY" }
+
+# DataDog integration
+datadog = { api_key_env = "DATADOG_API_KEY", app_key_env = "DATADOG_APP_KEY" }
+
+# Custom webhook notifications
+webhook = { url_env = "MONITORING_WEBHOOK_URL" }

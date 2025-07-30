@@ -1,0 +1,42 @@
+# Cargo configuration for ZKP Dataset Ledger
+
+[build]
+# Enable parallel compilation for faster builds
+jobs = 0  # Use all available cores
+
+[target.x86_64-unknown-linux-gnu]
+# Optimize for modern CPUs (cryptographic workloads benefit)
+rustflags = ["-C", "target-cpu=native"]
+
+[registries.crates-io]
+protocol = "sparse"
+
+# Alias for common development commands
+[alias]
+# Quality checks
+xtask-fmt = "fmt --all"
+xtask-clippy = "clippy --all-targets --all-features -- -D warnings"
+xtask-test = "test --all-features"
+
+# Advanced testing
+test-mutation = "mutagen test"
+test-property = "test --features property-testing"
+test-fuzz = "fuzz run"
+
+# Coverage and profiling
+cov = "tarpaulin --out Html --output-dir coverage/"
+prof = "build --release && perf record --call-graph=dwarf"
+
+# Cryptographic benchmarks
+bench-crypto = "bench --bench proof_generation"
+bench-verify = "bench --bench verification"
+bench-all = "bench --features benchmarks"
+
+# Security auditing
+audit-deps = "audit"
+audit-unused = "udeps --all-targets"
+audit-supply-chain = "vet"
+
+# Release preparation
+pre-release = "hack check --each-feature --no-dev-deps"
+release-dry = "publish --dry-run"

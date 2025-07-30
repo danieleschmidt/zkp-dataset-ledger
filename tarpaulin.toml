@@ -1,0 +1,39 @@
+# Tarpaulin configuration for code coverage
+# Used by: cargo tarpaulin / make test-coverage
+
+[config]
+# Coverage output options
+out = ["Html", "Lcov", "Json"]
+output-dir = "coverage/"
+
+# Test configuration
+all-features = true
+workspace = true
+follow-exec = true
+count = true
+line = true
+branch = true
+
+# Exclude generated code and tests from coverage
+exclude = [
+    "src/bin/",
+    "benches/",
+    "examples/",
+    "tests/"
+]
+
+# Ignore files that shouldn't be covered
+exclude-files = [
+    "src/crypto/circuits/generated/*",
+    "*/tests/*",
+    "*/benches/*"
+]
+
+# Performance tuning for cryptographic tests
+timeout = 300  # 5 minutes for ZK proof tests
+no-fail-fast = true
+
+# CI-specific configuration
+[ci]
+coveralls = "COVERALLS_REPO_TOKEN"
+codecov = "CODECOV_TOKEN"
