@@ -1,0 +1,123 @@
+# Supply Chain Security Configuration
+# Used by cargo-vet for dependency auditing
+
+[supply-chain]
+# Define trusted publishers and organizations
+[supply-chain.publisher."arkworks-rs"]
+description = "Arkworks cryptographic library ecosystem"
+trust-level = "high"
+contact = "https://github.com/arkworks-rs"
+notes = "Core ZK cryptography dependency - regularly audited"
+
+[supply-chain.publisher."RustCrypto"]
+description = "RustCrypto organization - cryptographic implementations"
+trust-level = "high"
+contact = "https://github.com/RustCrypto"
+notes = "Trusted cryptographic primitives"
+
+[supply-chain.publisher."serde-rs"]
+description = "Serde serialization ecosystem"
+trust-level = "high"
+contact = "https://github.com/serde-rs"
+notes = "Serialization framework - widely used and audited"
+
+[supply-chain.publisher."tokio-rs"]
+description = "Tokio async runtime ecosystem"
+trust-level = "high"
+contact = "https://github.com/tokio-rs"
+notes = "Async runtime - essential for I/O operations"
+
+# Risk assessment criteria
+[criteria]
+[criteria."crypto-safe"]
+description = "Cryptographically safe implementation"
+details = """
+Requirements:
+- No use of deprecated cryptographic algorithms
+- Constant-time implementations where relevant
+- Proper random number generation
+- Side-channel attack resistance considerations
+"""
+
+[criteria."memory-safe"]
+description = "Memory safety verified"
+details = """
+Requirements:
+- No unsafe code, or unsafe code has been reviewed
+- No memory leaks or buffer overflows
+- Proper bounds checking
+- Safe handling of sensitive data (zeroization)
+"""
+
+[criteria."supply-chain-safe"]
+description = "Supply chain security verified"
+details = """
+Requirements:
+- Author identity verified
+- No suspicious code patterns
+- Regular maintenance and updates
+- Transparent development process
+"""
+
+# Exemptions for specific crates
+[exemptions]
+[exemptions."ring"]
+criteria = ["crypto-safe", "memory-safe"]
+notes = "C cryptographic library - externally audited, widely used"
+expires = "2025-12-31"
+
+[exemptions."getrandom"]
+criteria = ["crypto-safe"]
+notes = "System entropy access - platform-specific implementations"
+expires = "2025-12-31"
+
+# Audit configurations
+[audits]
+who = "ZKP Dataset Ledger Team <security@terragon.ai>"
+criteria = ["crypto-safe", "memory-safe", "supply-chain-safe"]
+delta = true
+aggregated-from = [
+    "https://raw.githubusercontent.com/google/supply-chain/main/audits.toml",
+    "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
+]
+
+# Policy configuration
+[policy]
+# Require audit for any crate used in cryptographic operations
+audit-as-crates-io = true
+
+# Trust configuration
+[[policy.trust]]
+criteria = ["crypto-safe", "memory-safe"]
+description = "Core cryptographic dependencies"
+includes = [
+    "ark-*",
+    "sha3",
+    "blake3",
+    "curve25519-dalek",
+    "ed25519-dalek"
+]
+
+[[policy.trust]]
+criteria = ["memory-safe", "supply-chain-safe"]
+description = "Standard library and ecosystem crates"
+includes = [
+    "serde*",
+    "tokio*",
+    "clap*",
+    "anyhow",
+    "thiserror"
+]
+
+# Vulnerability response policy
+[vulnerability-response]
+# Automatic actions when vulnerabilities are detected
+high-severity = "fail-build"
+medium-severity = "warn-and-continue"
+low-severity = "log-only"
+
+# Grace period for applying security updates
+grace-period-days = 30
+
+# Emergency contact for critical vulnerabilities
+emergency-contact = "security@terragon.ai"
