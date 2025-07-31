@@ -1,0 +1,291 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate dependency management configuration for ZKP Dataset Ledger",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeDigests",
+    ":automergeBranch"
+  ],
+  "timezone": "America/Los_Angeles",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "assignees": [
+    "@maintainers"
+  ],
+  "reviewers": [
+    "@security-team"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "separateMinorPatch": false,
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "rust": {
+    "enabled": true,
+    "rangeStrategy": "bump"
+  },
+  "packageRules": [
+    {
+      "description": "Group arkworks cryptographic dependencies together",
+      "groupName": "arkworks ecosystem",
+      "matchPackagePatterns": [
+        "^ark-"
+      ],
+      "schedule": [
+        "before 6am on first day of month"
+      ],
+      "prPriority": 10,
+      "reviewers": [
+        "@crypto-team"
+      ],
+      "labels": [
+        "cryptography",
+        "security-review-required"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Group cryptographic hash functions",
+      "groupName": "cryptographic hashing",
+      "matchPackageNames": [
+        "sha3",
+        "blake3",
+        "merkletree"
+      ],
+      "schedule": [
+        "before 6am on first day of month"
+      ],
+      "prPriority": 10,
+      "reviewers": [
+        "@crypto-team"
+      ],
+      "labels": [
+        "cryptography",
+        "security-review-required"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Development dependencies - faster updates",
+      "groupName": "development dependencies",
+      "matchDepTypes": [
+        "dev-dependencies"
+      ],
+      "automerge": true,
+      "automergeType": "branch",
+      "minimumReleaseAge": "3 days",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "description": "Build dependencies",
+      "groupName": "build dependencies", 
+      "matchDepTypes": [
+        "build-dependencies"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "@devops-team"
+      ],
+      "labels": [
+        "build-system"
+      ]
+    },
+    {
+      "description": "Security-critical dependencies require manual review",
+      "matchPackageNames": [
+        "tokio",
+        "serde",
+        "sqlx",
+        "rocksdb"
+      ],
+      "automerge": false,
+      "prPriority": 8,
+      "reviewers": [
+        "@security-team",
+        "@maintainers"
+      ],
+      "labels": [
+        "security-critical",
+        "manual-review-required"
+      ],
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "before 6am on first day of month"
+      ]
+    },
+    {
+      "description": "Major version updates require extensive testing",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "prPriority": 5,
+      "reviewers": [
+        "@maintainers",
+        "@security-team"
+      ],
+      "labels": [
+        "major-update",
+        "breaking-changes-possible"
+      ],
+      "minimumReleaseAge": "14 days",
+      "schedule": [
+        "before 6am on first day of month"
+      ],
+      "addLabels": [
+        "requires-integration-testing"
+      ]
+    },
+    {
+      "description": "Patch updates can be auto-merged after validation",
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "branch",
+      "minimumReleaseAge": "1 day",
+      "schedule": [
+        "before 6am every weekday"
+      ]
+    },
+    {
+      "description": "Minor updates require review but can be fast-tracked",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "3 days",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "description": "Pin Docker base images to specific versions",
+      "matchDatasources": [
+        "docker"
+      ],
+      "rangeStrategy": "pin",
+      "automerge": false,
+      "reviewers": [
+        "@devops-team"
+      ],
+      "labels": [
+        "docker",
+        "infrastructure"
+      ]
+    },
+    {
+      "description": "GitHub Actions should be pinned to commit SHAs",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "rangeStrategy": "pin",
+      "pinDigests": true,
+      "automerge": true,
+      "automergeType": "branch",
+      "minimumReleaseAge": "3 days"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "assignees": [
+      "@security-team"
+    ],
+    "labels": [
+      "security",
+      "vulnerability"
+    ],
+    "prPriority": 20,
+    "schedule": [
+      "at any time"
+    ],
+    "automerge": false
+  },
+  "osvVulnerabilityAlerts": true,
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "ZKP Dataset Ledger Dependency Dashboard",
+  "dependencyDashboardHeader": "This dashboard tracks all dependency updates for the ZKP Dataset Ledger project. Security updates are prioritized and cryptographic dependencies require manual review.",
+  "dependencyDashboardFooter": "For questions about dependency updates, contact @security-team or @maintainers.",
+  "dependencyDashboardLabels": [
+    "dependencies",
+    "dashboard"
+  ],
+  "configMigration": true,
+  "onboardingConfig": {
+    "extends": [
+      "config:recommended"
+    ]
+  },
+  "ignoreDeps": [
+    "rust",
+    "cargo"
+  ],
+  "ignorePresets": [
+    ":prHourlyLimit2"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "automergeType": "branch",
+    "schedule": [
+      "before 6am on sunday"
+    ],
+    "commitMessageAction": "refresh",
+    "commitMessageTopic": "lock file",
+    "prTitle": "chore: refresh Cargo.lock"
+  },
+  "postUpdateOptions": [
+    "cargoUpdateLockFile"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Rust version in Dockerfile",
+      "fileMatch": [
+        "^Dockerfile$"
+      ],
+      "matchStrings": [
+        "FROM rust:(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "rust",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex", 
+      "description": "Update Rust toolchain version",
+      "fileMatch": [
+        "^rust-toolchain\\.toml?$"
+      ],
+      "matchStrings": [
+        "channel\\s*=\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "rust-lang/rust",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "prBodyTemplate": "This PR updates {{depName}} from {{currentVersion}} to {{newVersion}}.\n\n{{#if hasReleaseNotes}}\n## Release Notes\n{{{releaseNotes}}}\n{{/if}}\n\n{{#if (containsString labels 'security')}}\n⚠️ **Security Update**: This update addresses security vulnerabilities. Please review and merge promptly.\n{{/if}}\n\n{{#if (containsString labels 'cryptography')}}\n🔐 **Cryptographic Dependency**: This update affects cryptographic functionality. Thorough testing is required before merge.\n{{/if}}\n\n## Verification Steps\n- [ ] All tests pass\n- [ ] Security scan passes\n- [ ] Performance benchmarks show no regression\n{{#if (containsString labels 'cryptography')}}\n- [ ] Cryptographic operations still function correctly\n- [ ] Proof generation and verification work as expected\n{{/if}}\n\n---\nThis PR was automatically created by Renovate Bot.",
+  "prFooter": "Questions? Check the [dependency management documentation](docs/dependency-management.md) or contact @maintainers.",
+  "rebaseWhen": "behind-base-branch",
+  "stopUpdatingLabel": "renovate-stop",
+  "unicodeEmoji": true,
+  "gitAuthor": "Renovate Bot <renovate@terragon.ai>"
+}

@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use zkp_dataset_ledger::{Ledger, Dataset, ProofConfig, Result};
+use zkp_dataset_ledger::{Dataset, Ledger, ProofConfig, Result};
 
 #[derive(Parser)]
 #[command(name = "zkp-ledger")]
@@ -28,9 +28,9 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::init();
-    
+
     let cli = Cli::parse();
-    
+
     match cli.command {
         Commands::Init { project } => {
             let _ledger = Ledger::new(&project)?;
@@ -40,12 +40,16 @@ async fn main() -> Result<()> {
             let mut ledger = Ledger::new("default")?;
             let dataset = Dataset::from_path(&dataset)?;
             let proof = ledger.notarize_dataset(dataset, &name, ProofConfig::default())?;
-            println!("Notarized dataset '{}' with proof size: {} bytes", name, proof.size_bytes());
+            println!(
+                "Notarized dataset '{}' with proof size: {} bytes",
+                name,
+                proof.size_bytes()
+            );
         }
         Commands::Verify { proof_file: _ } => {
             println!("Proof verification not yet implemented");
         }
     }
-    
+
     Ok(())
 }
