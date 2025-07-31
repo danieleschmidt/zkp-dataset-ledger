@@ -1,0 +1,214 @@
+# Software Bill of Materials (SBOM) configuration
+# For comprehensive supply chain security tracking
+
+[sbom]
+# SBOM format and standards
+format = "spdx-json"           # SPDX JSON format for interoperability
+spdx_version = "SPDX-2.3"      # Latest SPDX specification version
+data_license = "CC0-1.0"       # Creative Commons Zero license for SBOM data
+
+# Document information
+document_name = "ZKP-Dataset-Ledger-SBOM"
+document_namespace = "https://github.com/terragon/zkp-dataset-ledger"
+creator = "Organization: Terragon Labs"
+created = "auto"               # Automatically set to current timestamp
+
+# Package information
+package_name = "zkp-dataset-ledger"
+package_version = "auto"       # Extract from Cargo.toml
+package_supplier = "Organization: Terragon Labs"
+package_download_location = "https://github.com/terragon/zkp-dataset-ledger"
+package_homepage = "https://github.com/terragon/zkp-dataset-ledger"
+package_license = "MIT"
+
+[dependencies]
+# Dependency tracking configuration
+
+# Include all dependency types
+include_dev_dependencies = true
+include_build_dependencies = true
+include_optional_dependencies = true
+
+# Cryptographic dependency special handling
+crypto_dependencies = [
+    "ark-bls12-381",
+    "ark-groth16", 
+    "ark-std",
+    "ark-ff",
+    "ark-ec",
+    "ark-poly",
+    "ark-relations",
+    "ark-r1cs-std",
+    "ark-crypto-primitives",
+    "sha3",
+    "blake3",
+    "merkletree",
+]
+
+# Critical security dependencies requiring verification
+security_critical = [
+    "ark-*",          # All arkworks cryptographic libraries
+    "sha3",           # Cryptographic hash function
+    "blake3",         # Cryptographic hash function
+    "tokio",          # Async runtime
+    "serde",          # Serialization (data integrity)
+    "sqlx",           # Database access
+    "rocksdb",        # Storage backend
+]
+
+[vulnerability_scanning]
+# Configure vulnerability scanning for SBOM
+
+# Vulnerability databases to check against
+databases = [
+    "rustsec",        # RustSec Advisory Database
+    "cve",            # Common Vulnerabilities and Exposures
+    "ghsa",           # GitHub Security Advisories
+    "osv",            # Open Source Vulnerabilities
+]
+
+# Severity thresholds
+fail_on_severity = "medium"    # Fail build on medium or higher severity
+warn_on_severity = "low"       # Warn on low severity vulnerabilities
+
+# Ignore specific vulnerabilities (with justification)
+ignore_vulnerabilities = [
+    # Example: "RUSTSEC-2023-0001",  # False positive for ZK use case
+]
+
+[compliance]
+# Compliance and regulatory requirements
+
+# Standards compliance
+standards = [
+    "SLSA-3",         # Supply-chain Levels for Software Artifacts
+    "NIST-SP-800-161", # Supply Chain Risk Management
+    "ISO-27001",      # Information Security Management
+    "SOC-2-Type-II",  # Service Organization Control 2
+]
+
+# Export compliance
+export_control = true
+export_classification = "EAR99"  # Export Administration Regulations
+
+# Privacy compliance
+privacy_standards = [
+    "GDPR",           # General Data Protection Regulation
+    "CCPA",           # California Consumer Privacy Act
+]
+
+[generation]
+# SBOM generation settings
+
+# Output formats
+output_formats = ["spdx-json", "cyclone-json", "spdx-yaml"]
+output_directory = "target/sbom/"
+
+# Include source code hashes
+include_file_hashes = true
+hash_algorithms = ["sha256", "sha512"]
+
+# Include license information
+include_licenses = true
+license_detection = "auto"
+
+# Include build information
+include_build_info = true
+build_tools = ["cargo", "rustc"]
+
+# Digital signatures
+sign_sbom = true
+signature_format = "json-ld"
+signing_key = "env:SBOM_SIGNING_KEY"  # Environment variable
+
+[validation]
+# SBOM validation and quality checks
+
+# Completeness checks
+require_all_dependencies = true
+require_license_info = true
+require_version_info = true
+require_hash_info = true
+
+# Quality thresholds
+min_completeness_score = 90    # Minimum completeness percentage
+max_unknown_licenses = 5       # Maximum number of unknown licenses
+
+# Validation tools
+validation_tools = [
+    "spdx-tools",     # SPDX validation
+    "ntia-checker",   # NTIA SBOM guidelines
+    "cyclone-dx-cli", # CycloneDX validation
+]
+
+[automation]
+# Automated SBOM generation and updates
+
+# Generation triggers
+generate_on_build = true
+generate_on_release = true
+generate_on_dependency_update = true
+
+# Update schedule
+auto_update_schedule = "weekly"
+update_day = "sunday"
+update_time = "02:00"
+
+# Integration points
+integrate_with_ci = true
+ci_fail_on_validation_error = true
+
+# Distribution
+publish_to_registry = true
+registry_url = "https://sbom.registry.example.com"
+registry_auth = "env:SBOM_REGISTRY_TOKEN"
+
+[reporting]
+# SBOM reporting and analytics
+
+# Report formats
+report_formats = ["html", "pdf", "json"]
+include_charts = true
+include_trends = true
+
+# Metrics to track
+metrics = [
+    "dependency_count",
+    "vulnerability_count", 
+    "license_compliance",
+    "crypto_dependency_versions",
+    "supply_chain_risk_score",
+]
+
+# Alerts and notifications
+alerts = [
+    {type = "new_vulnerability", severity = "high", notify = "security-team"},
+    {type = "license_violation", notify = "legal-team"},
+    {type = "crypto_deprecation", notify = "crypto-team"},
+]
+
+# Historical tracking
+track_history = true
+history_retention = "2y"      # Keep 2 years of SBOM history
+compare_with_previous = true
+
+[tools]
+# Tools for SBOM generation and management
+
+# Primary SBOM generation tool
+generator = "cargo-cyclonedx"  # Or "syft", "cargo-auditable"
+generator_version = "latest"
+
+# Validation tools
+validators = [
+    "spdx-tools",
+    "cyclonedx-cli",
+    "sbom-tool",
+]
+
+# Integration tools
+integrations = [
+    "dependency-track",   # Dependency tracking
+    "grype",             # Vulnerability scanning
+    "trivy",             # Security scanning
+]

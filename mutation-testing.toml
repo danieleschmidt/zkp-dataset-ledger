@@ -1,0 +1,72 @@
+# Mutation testing configuration for ZKP Dataset Ledger
+# Tests the quality of test suite by introducing mutations
+
+[cargo-mutants]
+# Timeout for running tests (important for cryptographic operations)
+timeout = 300
+
+# Exclude paths that shouldn't be mutation tested
+exclude_dirs = [
+    "target/",
+    "benches/",
+    "examples/",
+    "scripts/",
+]
+
+# Exclude files from mutation testing
+exclude_files = [
+    "src/bin/cli.rs",  # CLI entry point
+    "build.rs",        # Build script
+]
+
+# Exclude specific functions that are hard to test or critical
+exclude_functions = [
+    # Cryptographic setup functions (require specific parameters)
+    "setup_circuit",
+    "generate_trusted_setup",
+    
+    # Error handling functions
+    "*::fmt",
+    "*::from",
+    
+    # Test utilities
+    "*::test_*",
+    "*::bench_*",
+]
+
+# Focus on critical modules
+include_modules = [
+    "crypto",
+    "ledger", 
+    "proof",
+    "circuits",
+]
+
+# Test command to run
+test_cmd = ["cargo", "test", "--all-features"]
+
+# Minimum test score threshold (percentage)
+minimum_test_score = 75
+
+# Generate HTML report
+output_format = "html"
+output_dir = "target/mutants/"
+
+# Performance settings
+jobs = 4
+baseline = "auto"
+
+# Mutation operators to use
+operators = [
+    "replace_binary_operator",
+    "replace_constant",
+    "replace_comparison",
+    "negate_condition",
+    "remove_statement",
+]
+
+# Skip mutations that are equivalent to original code
+skip_equivalent = true
+
+# Log level
+log_level = "info"

@@ -1,0 +1,274 @@
+# Container security scanning configuration
+# Comprehensive security analysis for Docker images
+
+[scanning]
+# Container security scanning tools and configuration
+
+# Primary scanners
+scanners = [
+    "trivy",          # Comprehensive vulnerability scanner
+    "grype",          # Vulnerability scanner by Anchore
+    "clair",          # Static analysis for vulnerabilities
+    "snyk",           # Commercial security scanning
+]
+
+# Scan triggers
+scan_on_build = true
+scan_on_push = true
+scan_on_schedule = true
+schedule = "daily"
+schedule_time = "03:00"
+
+# Scan scope
+scan_layers = true          # Scan individual image layers
+scan_config = true          # Scan container configuration
+scan_secrets = true         # Scan for embedded secrets
+scan_malware = true         # Malware detection
+
+[vulnerability_policy]
+# Vulnerability handling policy
+
+# Severity thresholds
+fail_on_severity = "high"   # Fail pipeline on high/critical vulnerabilities
+warn_on_severity = "medium" # Warn on medium severity vulnerabilities
+ignore_severity = "negligible"  # Ignore negligible vulnerabilities
+
+# CVSS score thresholds
+fail_on_cvss = 7.0         # Fail on CVSS score >= 7.0
+warn_on_cvss = 4.0         # Warn on CVSS score >= 4.0
+
+# Vulnerability databases
+databases = [
+    "nvd",            # National Vulnerability Database
+    "ubuntu-cve",     # Ubuntu CVE database
+    "debian-security", # Debian security database
+    "alpine-secdb",   # Alpine security database
+    "rustsec",        # Rust security database
+]
+
+# Exceptions (with justification required)
+exceptions = [
+    # {cve = "CVE-2023-XXXX", reason = "False positive for containerized use", expires = "2024-12-31"},
+]
+
+[base_image_policy]
+# Base image security requirements
+
+# Allowed base images
+allowed_base_images = [
+    "ubuntu:22.04",
+    "debian:bookworm-slim", 
+    "alpine:3.18",
+    "gcr.io/distroless/cc",
+    "scratch",              # For static binaries
+]
+
+# Base image requirements
+require_official_images = true
+require_minimal_images = true
+max_image_age_days = 90
+require_security_updates = true
+
+# Base image scanning
+scan_base_image = true
+fail_on_base_vulnerabilities = true
+
+[secrets_detection]
+# Secret and sensitive data detection
+
+# Secret scanners
+secret_scanners = [
+    "trufflehog",     # Comprehensive secret detection
+    "gitleaks",       # Git secret detection
+    "detect-secrets", # Yelp's secret detection
+]
+
+# Secret patterns to detect
+secret_patterns = [
+    "api_keys",
+    "database_passwords",
+    "private_keys",
+    "certificates",
+    "tokens",
+    "ssh_keys",
+    "cloud_credentials",
+]
+
+# Specific patterns for this project
+custom_patterns = [
+    "zkp_private_keys",
+    "groth16_setup_keys",
+    "database_connection_strings",
+    "rocksdb_encryption_keys",
+]
+
+# Allowed secrets (encrypted/test data)
+allowed_secrets = [
+    "test_data/sample_key.pem",  # Test data only
+]
+
+[runtime_security]
+# Runtime security configuration
+
+# Runtime protection
+enable_runtime_protection = true
+readonly_filesystem = true
+no_new_privileges = true
+drop_all_capabilities = true
+
+# Required capabilities (minimal set)
+required_capabilities = [
+    # Minimal capabilities for ZKP operations
+]
+
+# User configuration
+run_as_non_root = true
+user_id = 65534           # nobody user
+group_id = 65534          # nobody group
+
+# Network security
+network_policy = "deny_all"
+allowed_outbound_ports = [
+    5432,                 # PostgreSQL (if used)
+    80,                   # HTTP (for updates only)
+    443,                  # HTTPS (for updates only)
+]
+
+[compliance]
+# Security compliance standards
+
+# Compliance frameworks
+frameworks = [
+    "CIS-Docker-Benchmark",   # CIS Docker Benchmark
+    "NIST-800-190",          # NIST Container Security Guidelines
+    "PCI-DSS",               # Payment Card Industry standards
+    "HIPAA",                 # Healthcare compliance
+    "SOC-2",                 # Service Organization Control 2
+]
+
+# Specific compliance checks
+compliance_checks = [
+    "dockerfile_best_practices",
+    "image_vulnerability_scan",
+    "secrets_detection",
+    "runtime_security_config",
+    "network_security_policy",
+    "resource_limits",
+    "logging_configuration",
+]
+
+[image_signing]
+# Container image signing and verification
+
+# Enable image signing
+enable_signing = true
+signing_format = "cosign"     # Use Cosign for signing
+
+# Signing configuration
+signing_key = "env:COSIGN_PRIVATE_KEY"
+signing_password = "env:COSIGN_PASSWORD"
+signature_repository = "ghcr.io/terragon/zkp-dataset-ledger-signatures"
+
+# Verification policy
+require_signature_verification = true
+trusted_signers = [
+    "terragon-labs",
+    "security-team",
+]
+
+# Attestation
+generate_attestations = true
+attestation_types = [
+    "slsa-provenance",
+    "vulnerability-scan",
+    "policy-compliance",
+]
+
+[monitoring]
+# Security monitoring and alerting
+
+# Monitor for security events
+monitor_vulnerabilities = true
+monitor_policy_violations = true
+monitor_runtime_anomalies = true
+
+# Alerting configuration
+alerts = [
+    {type = "critical_vulnerability", notify = "security-team", escalate_after = "1h"},
+    {type = "policy_violation", notify = "devops-team", escalate_after = "4h"},
+    {type = "runtime_anomaly", notify = "on-call", escalate_after = "15m"},
+]
+
+# Metrics collection
+collect_security_metrics = true
+metrics_retention = "90d"
+
+# Integration with security tools
+integrations = [
+    "splunk",             # SIEM integration
+    "elk-stack",          # Logging and analytics
+    "prometheus",         # Metrics collection
+    "grafana",            # Visualization
+]
+
+[reporting]
+# Security reporting and documentation
+
+# Report formats
+report_formats = ["html", "json", "sarif", "junit"]
+report_directory = "target/security-reports/"
+
+# Include in reports
+include_vulnerability_details = true
+include_compliance_status = true
+include_remediation_guidance = true
+include_risk_assessment = true
+
+# Report distribution
+distribute_reports = true
+report_recipients = [
+    "security-team@terragon.ai",
+    "devops-team@terragon.ai",
+]
+
+# Historical tracking
+track_security_posture = true
+compare_with_baseline = true
+security_trend_analysis = true
+
+[remediation]
+# Automated remediation and response
+
+# Auto-remediation policies
+enable_auto_remediation = false  # Manual review required for crypto code
+auto_update_base_images = false  # Manual approval required
+
+# Manual remediation workflows
+create_remediation_tickets = true
+ticket_system = "jira"
+assign_to_security_team = true
+
+# Remediation SLAs
+critical_sla = "24h"
+high_sla = "72h"
+medium_sla = "2w"
+low_sla = "1m"
+
+[tools_configuration]
+# Specific tool configurations
+
+[tools_configuration.trivy]
+config_file = ".trivyignore"
+scan_type = ["vuln", "config", "secret"]
+format = "sarif"
+exit_code = 1
+
+[tools_configuration.grype]
+config_file = ".grype.yaml"
+scope = "all-layers"
+only_fixed = false
+
+[tools_configuration.snyk]
+org = "terragon-labs"
+severity_threshold = "high"
+project_name = "zkp-dataset-ledger"

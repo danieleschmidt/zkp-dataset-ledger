@@ -1,0 +1,96 @@
+# Property-based testing configuration for ZKP Dataset Ledger
+# Ensures cryptographic properties hold under random inputs
+
+[proptest]
+# Number of test cases to generate
+cases = 1000
+
+# Maximum number of shrink iterations
+max_shrink_iters = 10000
+
+# Shrink timeout in milliseconds
+shrink_time = 30000
+
+# Test result cache
+result_cache = "proptest-regressions"
+
+# Fork mode for isolation
+fork = true
+
+# Timeout per test case (important for crypto operations)
+timeout = 60000
+
+# Verbose output
+verbose = 1
+
+# Strategy configuration
+[proptest.strategies]
+# Configure specific strategies for cryptographic types
+
+# Field element generation
+field_element_range = "1..=1000000"
+
+# Dataset size limits for testing
+dataset_min_rows = 1
+dataset_max_rows = 10000
+
+# Proof parameter limits
+proof_security_bits = 128
+
+[test_categories]
+# Define different categories of property tests
+
+# Core cryptographic properties
+crypto_properties = [
+    "proof_soundness",          # Valid proofs always verify
+    "proof_completeness",       # Invalid proofs never verify
+    "zero_knowledge",           # Proofs reveal no information
+    "circuit_satisfiability",   # Circuits have valid witnesses
+]
+
+# Ledger properties
+ledger_properties = [
+    "immutability",             # Once written, entries don't change
+    "consistency",              # All operations maintain valid state
+    "auditability",             # Full history is traceable
+    "integrity",                # Hash chains are valid
+]
+
+# Storage properties
+storage_properties = [
+    "persistence",              # Data survives restarts
+    "atomicity",                # Transactions are all-or-nothing
+    "isolation",                # Concurrent operations don't interfere
+    "durability",               # Committed data is permanent
+]
+
+# Performance properties
+performance_properties = [
+    "proof_generation_time",    # Proofs generate within time bounds
+    "verification_time",        # Verification is fast
+    "memory_usage",             # Memory usage stays bounded
+    "scalability",              # Performance scales predictably
+]
+
+[test_data]
+# Configuration for generating test data
+
+# Synthetic dataset generation
+synthetic_datasets = true
+max_columns = 100
+column_types = ["int", "float", "string", "bool"]
+
+# Use deterministic randomness for reproducibility
+seed = 42
+
+# Generate edge cases
+include_edge_cases = true
+edge_cases = [
+    "empty_dataset",
+    "single_row",
+    "single_column", 
+    "large_dataset",
+    "unicode_strings",
+    "null_values",
+    "extreme_numbers",
+]

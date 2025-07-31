@@ -1,0 +1,152 @@
+# Load testing configuration for ZKP Dataset Ledger
+# Performance and scalability testing under various loads
+
+[load_test]
+# Test duration settings
+duration = "10m"
+ramp_up = "2m"
+ramp_down = "1m"
+
+# Concurrent users/operations
+max_virtual_users = 100
+spawn_rate = 10  # users per second
+
+# Test scenarios
+scenarios = [
+    "proof_generation_load",
+    "verification_load", 
+    "storage_load",
+    "concurrent_operations",
+    "memory_stress",
+]
+
+[scenarios.proof_generation_load]
+# Test proof generation under load
+name = "Proof Generation Load Test"
+weight = 30
+dataset_sizes = [1000, 10000, 100000]
+operations_per_second = 10
+max_response_time = "30s"
+success_rate_threshold = 95
+
+[scenarios.verification_load]
+# Test proof verification under high load
+name = "Verification Load Test" 
+weight = 40
+concurrent_verifications = 1000
+operations_per_second = 100
+max_response_time = "100ms"
+success_rate_threshold = 99
+
+[scenarios.storage_load]
+# Test storage backend performance
+name = "Storage Load Test"
+weight = 20
+concurrent_writes = 50
+concurrent_reads = 200
+data_size_range = "1KB-10MB"
+operations_per_second = 500
+max_response_time = "50ms"
+
+[scenarios.concurrent_operations]
+# Test mixed concurrent operations
+name = "Concurrent Operations Test"
+weight = 10
+mixed_operations = true
+read_write_ratio = "80:20"
+proof_verify_ratio = "60:40"
+max_response_time = "5s"
+
+[performance_thresholds]
+# Define performance SLA thresholds
+
+# Proof generation
+proof_generation_p95 = "5s"    # 95th percentile < 5 seconds
+proof_generation_p99 = "10s"   # 99th percentile < 10 seconds
+
+# Verification
+verification_p95 = "50ms"      # 95th percentile < 50ms
+verification_p99 = "100ms"     # 99th percentile < 100ms
+
+# Memory usage
+max_memory_usage = "4GB"       # Maximum memory per process
+memory_leak_threshold = "100MB/hour"  # Memory growth limit
+
+# Storage
+storage_read_p95 = "10ms"      # 95th percentile read time
+storage_write_p95 = "50ms"     # 95th percentile write time
+
+# System resources
+max_cpu_usage = 80             # Maximum CPU usage percentage
+max_disk_io = "100MB/s"        # Maximum disk I/O
+
+[monitoring]
+# Monitoring and metrics collection during load tests
+
+# System metrics to collect
+system_metrics = [
+    "cpu_usage",
+    "memory_usage",
+    "disk_io",
+    "network_io",
+    "file_descriptors",
+]
+
+# Application metrics
+app_metrics = [
+    "proof_generation_time",
+    "verification_time", 
+    "storage_latency",
+    "error_rate",
+    "throughput",
+    "queue_depth",
+]
+
+# Collection interval
+metrics_interval = "1s"
+
+# Alerting thresholds
+alerts = [
+    {metric = "error_rate", threshold = 5, operator = ">"},
+    {metric = "cpu_usage", threshold = 90, operator = ">"},
+    {metric = "memory_usage", threshold = 3.5, unit = "GB", operator = ">"},
+]
+
+[reporting]
+# Test report configuration
+
+# Report formats
+formats = ["html", "json", "junit"]
+
+# Include graphs and charts
+include_graphs = true
+graph_types = ["response_time", "throughput", "error_rate", "resource_usage"]
+
+# Comparison with baseline
+compare_with_baseline = true
+baseline_file = "load-test-baseline.json"
+
+# Performance regression detection
+regression_threshold = 10  # Percentage degradation that triggers failure
+
+# Export results
+export_raw_data = true
+export_directory = "target/load-test-results/"
+
+[environment]
+# Test environment configuration
+
+# Database settings for load testing
+database_pool_size = 50
+database_connection_timeout = "5s"
+
+# Storage settings
+storage_cache_size = "1GB"
+storage_write_buffer_size = "64MB"
+
+# Cryptographic settings
+crypto_thread_pool_size = 8
+crypto_cache_size = "512MB"
+
+# Garbage collection tuning (if applicable)
+gc_settings = "optimized_for_throughput"

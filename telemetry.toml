@@ -1,0 +1,352 @@
+# Comprehensive telemetry and observability configuration
+# Advanced monitoring for ZKP Dataset Ledger operations
+
+[tracing]
+# Distributed tracing configuration
+
+# Tracing backend
+backend = "jaeger"            # Primary tracing backend
+jaeger_endpoint = "http://localhost:14268/api/traces"
+service_name = "zkp-dataset-ledger"
+service_version = "auto"      # Extract from Cargo.toml
+
+# Sampling configuration
+sampling_ratio = 0.1          # Sample 10% of traces in production
+always_sample_errors = true   # Always sample traces with errors
+max_events_per_span = 128     # Limit events to prevent memory issues
+
+# Span configuration
+record_exception_events = true
+record_performance_metrics = true
+include_source_location = true
+
+# Critical operations to always trace
+always_trace_operations = [
+    "proof_generation",
+    "proof_verification", 
+    "dataset_notarization",
+    "ledger_operations",
+    "storage_operations",
+]
+
+[metrics]
+# Metrics collection and export
+
+# Metrics backend
+backend = "prometheus"
+prometheus_endpoint = "http://localhost:9090"
+push_gateway_endpoint = "http://localhost:9091"
+
+# Collection interval
+collection_interval = "15s"
+push_interval = "30s"
+
+# Custom metrics for ZKP operations
+custom_metrics = [
+    # Performance metrics
+    {name = "proof_generation_duration", type = "histogram", help = "Time to generate ZK proofs"},
+    {name = "proof_verification_duration", type = "histogram", help = "Time to verify ZK proofs"},
+    {name = "circuit_constraint_count", type = "gauge", help = "Number of constraints in ZK circuits"},
+    
+    # Throughput metrics
+    {name = "proofs_generated_total", type = "counter", help = "Total number of proofs generated"},
+    {name = "proofs_verified_total", type = "counter", help = "Total number of proofs verified"},
+    {name = "datasets_notarized_total", type = "counter", help = "Total datasets notarized"},
+    
+    # Error metrics
+    {name = "proof_generation_errors_total", type = "counter", help = "Proof generation failures"},
+    {name = "proof_verification_errors_total", type = "counter", help = "Proof verification failures"},
+    {name = "storage_errors_total", type = "counter", help = "Storage operation failures"},
+    
+    # Resource metrics
+    {name = "memory_usage_bytes", type = "gauge", help = "Memory usage in bytes"},
+    {name = "proof_size_bytes", type = "histogram", help = "Size of generated proofs in bytes"},
+    {name = "storage_size_bytes", type = "gauge", help = "Total storage size in bytes"},
+]
+
+# Metric labels
+default_labels = [
+    "service_name",
+    "service_version",
+    "environment",
+    "instance_id",
+]
+
+[logging]
+# Structured logging configuration
+
+# Log level and format
+level = "info"
+format = "json"
+timestamp_format = "rfc3339"
+
+# Log destinations
+destinations = [
+    "stdout",
+    "file:logs/zkp-ledger.log",
+    "syslog",
+]
+
+# Log rotation
+file_rotation = true
+max_file_size = "100MB"
+max_files = 10
+
+# Structured fields
+structured_fields = [
+    "timestamp",
+    "level", 
+    "service_name",
+    "trace_id",
+    "span_id",
+    "operation",
+    "duration",
+    "error",
+]
+
+# Security logging
+security_events = [
+    "proof_verification_failure",
+    "unauthorized_access_attempt",
+    "invalid_dataset_hash",
+    "storage_integrity_violation",
+]
+
+# Performance logging
+performance_events = [
+    "slow_proof_generation",     # > 10s
+    "slow_verification",         # > 100ms
+    "large_dataset_processing",  # > 1GB
+    "high_memory_usage",         # > 2GB
+]
+
+[alerting]
+# Alert management and escalation
+
+# Alert manager configuration
+alert_manager_url = "http://localhost:9093"
+webhook_url = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+
+# Alert rules
+rules = [
+    # Performance alerts
+    {
+        name = "slow_proof_generation",
+        condition = "proof_generation_duration > 30s",
+        severity = "warning",
+        description = "Proof generation taking longer than expected",
+        runbook_url = "https://wiki.example.com/zkp-performance-troubleshooting"
+    },
+    {
+        name = "high_proof_failure_rate", 
+        condition = "rate(proof_generation_errors_total[5m]) > 0.1",
+        severity = "critical",
+        description = "High rate of proof generation failures",
+        runbook_url = "https://wiki.example.com/zkp-error-troubleshooting"
+    },
+    {
+        name = "memory_leak_detected",
+        condition = "increase(memory_usage_bytes[1h]) > 100MB",
+        severity = "warning",
+        description = "Potential memory leak detected",
+        runbook_url = "https://wiki.example.com/memory-troubleshooting"
+    },
+    
+    # Security alerts
+    {
+        name = "proof_verification_failures",
+        condition = "rate(proof_verification_errors_total[5m]) > 0.01",
+        severity = "critical",
+        description = "High rate of proof verification failures - possible attack",
+        runbook_url = "https://wiki.example.com/security-incident-response"
+    },
+    {
+        name = "storage_integrity_violation",
+        condition = "storage_errors_total > 0",
+        severity = "critical", 
+        description = "Storage integrity violation detected",
+        runbook_url = "https://wiki.example.com/storage-integrity-response"
+    },
+]
+
+# Escalation policy
+escalation = [
+    {level = 1, after = "5m", notify = ["on-call-engineer"]},
+    {level = 2, after = "15m", notify = ["team-lead", "on-call-engineer"]},
+    {level = 3, after = "30m", notify = ["engineering-manager", "team-lead"]},
+]
+
+[dashboards]
+# Observability dashboards
+
+# Dashboard platform
+platform = "grafana"
+grafana_url = "http://localhost:3000"
+
+# Dashboard definitions
+dashboards = [
+    {
+        name = "ZKP Operations Overview",
+        panels = [
+            "proof_generation_rate",
+            "proof_verification_rate", 
+            "average_proof_time",
+            "error_rate",
+            "system_resource_usage"
+        ]
+    },
+    {
+        name = "Performance Monitoring",
+        panels = [
+            "proof_generation_duration_histogram",
+            "proof_verification_duration_histogram",
+            "memory_usage_over_time",
+            "storage_growth_rate",
+            "throughput_trends"
+        ]
+    },
+    {
+        name = "Security Monitoring", 
+        panels = [
+            "verification_failure_rate",
+            "storage_integrity_checks",
+            "access_patterns",
+            "anomaly_detection",
+            "security_event_timeline"
+        ]
+    },
+    {
+        name = "Business Metrics",
+        panels = [
+            "datasets_processed_daily",
+            "proof_success_rate",
+            "average_dataset_size",
+            "user_activity_patterns",
+            "cost_per_operation"
+        ]
+    }
+]
+
+# Dashboard refresh rates
+refresh_intervals = {
+    "real_time" = "5s",
+    "operational" = "30s", 
+    "business" = "5m"
+}
+
+[health_checks]
+# Service health monitoring
+
+# Health check endpoints
+endpoints = [
+    {path = "/health", type = "liveness", timeout = "5s"},
+    {path = "/ready", type = "readiness", timeout = "10s"},
+    {path = "/metrics", type = "metrics", timeout = "15s"},
+]
+
+# Health check components
+components = [
+    "database_connection",
+    "storage_backend",
+    "cryptographic_operations",
+    "memory_usage",
+    "disk_space",
+]
+
+# Health thresholds
+thresholds = {
+    "memory_usage_percent" = 90,
+    "disk_usage_percent" = 85,
+    "response_time_ms" = 1000,
+    "error_rate_percent" = 5
+}
+
+[profiling]
+# Performance profiling and analysis
+
+# Profiling tools
+tools = ["pprof", "perf", "flamegraph"]
+
+# Profiling modes
+continuous_profiling = true
+on_demand_profiling = true
+error_triggered_profiling = true
+
+# Profile types
+profile_types = [
+    "cpu",
+    "memory", 
+    "goroutines",
+    "mutex",
+    "block",
+]
+
+# Storage and retention
+profile_storage = "s3://profiling-bucket/zkp-ledger/"
+retention_period = "30d"
+
+[compliance_monitoring]
+# Compliance and audit trail monitoring
+
+# Compliance frameworks
+frameworks = ["SOC2", "ISO27001", "GDPR", "HIPAA"]
+
+# Audit events
+audit_events = [
+    "proof_generation",
+    "proof_verification",
+    "dataset_access",
+    "storage_modification",
+    "configuration_change",
+    "user_authentication",
+]
+
+# Audit trail requirements
+audit_trail = {
+    "retention_period" = "7y",
+    "immutable_storage" = true,
+    "encryption_at_rest" = true,
+    "digital_signatures" = true
+}
+
+[cost_monitoring]
+# Cost monitoring and optimization
+
+# Cost tracking
+track_compute_costs = true
+track_storage_costs = true
+track_network_costs = true
+
+# Cost allocation
+cost_allocation_tags = [
+    "environment",
+    "team",
+    "project",
+    "operation_type"
+]
+
+# Budget alerts
+budget_alerts = [
+    {threshold = 80, notify = ["finance-team"]},
+    {threshold = 95, notify = ["finance-team", "engineering-manager"]},
+    {threshold = 100, notify = ["finance-team", "engineering-manager", "cto"]}
+]
+
+[integration]
+# Integration with external monitoring systems
+
+# External systems
+external_systems = [
+    {name = "datadog", api_key = "env:DATADOG_API_KEY"},
+    {name = "newrelic", license_key = "env:NEWRELIC_LICENSE_KEY"},
+    {name = "honeycomb", api_key = "env:HONEYCOMB_API_KEY"},
+]
+
+# Data export
+export_formats = ["otlp", "prometheus", "jaeger", "zipkin"]
+export_intervals = "30s"
+
+# Correlation IDs
+enable_correlation_ids = true
+correlation_id_header = "X-Correlation-ID"
+propagate_correlation_ids = true

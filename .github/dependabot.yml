@@ -1,0 +1,76 @@
+# Dependabot configuration for ZKP Dataset Ledger
+# Automated dependency updates with security focus
+
+version: 2
+updates:
+  # Rust dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "maintainers"
+    assignees:
+      - "security-team"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    ignore:
+      # Ignore major version updates for critical cryptographic dependencies
+      # These require manual review and testing
+      - dependency-name: "ark-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "groth16"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Group arkworks ecosystem updates
+      ark-crypto:
+        patterns:
+          - "ark-*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:00"
+    reviewers:
+      - "devops-team"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Docker updates (if Dockerfile uses specific versions)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "11:00"
+    reviewers:
+      - "devops-team"
+    commit-message:
+      prefix: "docker"
+
+# Security alerts configuration
+# Enable security alerts for:
+# - High severity vulnerabilities
+# - Critical vulnerabilities
+# - Vulnerabilities in cryptographic dependencies
