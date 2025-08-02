@@ -1,0 +1,208 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug CLI Tool",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=zkp-ledger",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "zkp-ledger",
+          "kind": "bin"
+        }
+      },
+      "args": ["--help"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "debug",
+        "RUST_BACKTRACE": "1",
+        "ZKP_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug CLI - Notarize Dataset",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=zkp-ledger",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "zkp-ledger",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "notarize",
+        "${workspaceFolder}/test-data/sample.csv",
+        "--name",
+        "debug-dataset"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "zkp_dataset_ledger=trace",
+        "RUST_BACKTRACE": "full",
+        "ZKP_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Tests",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--all-features",
+          "--lib",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "zkp-dataset-ledger",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "debug",
+        "RUST_BACKTRACE": "1"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Integration Tests",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=integration_tests",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "integration_tests",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "debug",
+        "RUST_BACKTRACE": "1",
+        "ZKP_TEST_DATA_PATH": "${workspaceFolder}/test-data/"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Benchmark",
+      "cargo": {
+        "args": [
+          "build",
+          "--release",
+          "--features=benchmarks",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "proof_generation",
+          "kind": "bench"
+        }
+      },
+      "args": ["--bench"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "info",
+        "CARGO_PROFILE_RELEASE_DEBUG": "true"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Custom Circuit",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=zkp-ledger",
+          "--features=all",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "zkp-ledger",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "prove",
+        "--circuit",
+        "custom",
+        "--input",
+        "${workspaceFolder}/test-data/circuit-input.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "zkp_dataset_ledger::circuits=trace",
+        "RUST_BACKTRACE": "full",
+        "ZKP_DEBUG_CIRCUITS": "true"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Storage Backend",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=zkp-ledger",
+          "--features=postgres",
+          "--package=zkp-dataset-ledger"
+        ],
+        "filter": {
+          "name": "zkp-ledger",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "init",
+        "--storage",
+        "postgres",
+        "--database-url",
+        "postgresql://localhost/zkp_test"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_LOG": "zkp_dataset_ledger::storage=trace",
+        "RUST_BACKTRACE": "1",
+        "DATABASE_URL": "postgresql://localhost/zkp_test"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "attach",
+      "name": "Attach to Running Process",
+      "pid": "${command:pickProcess}",
+      "sourceLanguages": ["rust"]
+    }
+  ]
+}

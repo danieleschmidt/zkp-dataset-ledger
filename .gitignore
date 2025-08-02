@@ -3,11 +3,17 @@
 Cargo.lock
 
 # IDE Files
-.vscode/
+.vscode/settings.json.local
+.vscode/launch.json.local
 .idea/
 *.swp
 *.swo
 *~
+
+# Keep shared VS Code configuration
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
 
 # OS Files
 .DS_Store

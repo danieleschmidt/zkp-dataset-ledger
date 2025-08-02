@@ -1,0 +1,73 @@
+{
+  "name": "ZKP Dataset Ledger Development",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates",
+        "tamasfe.even-better-toml",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "ms-vscode.makefile-tools",
+        "ms-azuretools.vscode-docker",
+        "GitHub.copilot",
+        "GitHub.vscode-pull-request-github"
+      ],
+      "settings": {
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.cargo.features": "all",
+        "rust-analyzer.procMacro.enable": true,
+        "rust-analyzer.imports.granularity.group": "module",
+        "rust-analyzer.completion.addCallParentheses": false,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll": "explicit"
+        },
+        "files.associations": {
+          "*.toml": "toml",
+          "Cargo.lock": "toml"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "mounts": [
+    "source=${localWorkspaceFolder}/.cargo,target=/usr/local/cargo,type=bind",
+    "source=${localWorkspaceFolder}/target,target=${containerWorkspaceFolder}/target,type=bind"
+  ],
+  "forwardPorts": [8080, 3000, 5432],
+  "portsAttributes": {
+    "8080": {
+      "label": "ZKP Ledger API",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Documentation Server",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "PostgreSQL Database",
+      "onAutoForward": "silent"
+    }
+  },
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "RUST_BACKTRACE": "1",
+    "RUST_LOG": "debug",
+    "CARGO_INCREMENTAL": "1",
+    "CARGO_TARGET_DIR": "/workspaces/zkp-dataset-ledger/target"
+  }
+}

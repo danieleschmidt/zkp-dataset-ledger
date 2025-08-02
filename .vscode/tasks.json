@@ -1,0 +1,296 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev: Format, Lint, Test",
+      "type": "shell",
+      "command": "make",
+      "args": ["dev"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Run the complete development workflow: format, lint, and test"
+    },
+    {
+      "label": "build: Release Build",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["build", "--release", "--all-features"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Build optimized release version with all features"
+    },
+    {
+      "label": "test: Run All Tests",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["test", "--all-features", "--workspace"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Run all unit and integration tests"
+    },
+    {
+      "label": "test: Watch Mode",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["watch", "-x", "test --all-features"],
+      "group": "test",
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Run tests automatically when files change"
+    },
+    {
+      "label": "test: Coverage Report",
+      "type": "shell",
+      "command": "make",
+      "args": ["test-coverage"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Generate HTML test coverage report"
+    },
+    {
+      "label": "lint: Clippy Check",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Run Clippy linter with strict warnings"
+    },
+    {
+      "label": "lint: Fix Auto-fixable Issues",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["clippy", "--fix", "--allow-dirty", "--allow-staged", "--all-targets", "--all-features"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Automatically fix Clippy warnings where possible"
+    },
+    {
+      "label": "format: Check Formatting",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["fmt", "--", "--check"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Check if code is properly formatted"
+    },
+    {
+      "label": "format: Apply Formatting",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["fmt"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Format all Rust code"
+    },
+    {
+      "label": "bench: Run Benchmarks",
+      "type": "shell",
+      "command": "make",
+      "args": ["bench"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Run cryptographic performance benchmarks"
+    },
+    {
+      "label": "security: Audit Dependencies",
+      "type": "shell",
+      "command": "make",
+      "args": ["audit"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Check dependencies for security vulnerabilities"
+    },
+    {
+      "label": "deps: Check Outdated",
+      "type": "shell",
+      "command": "make",
+      "args": ["outdated"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Check for outdated dependencies"
+    },
+    {
+      "label": "docker: Build Image",
+      "type": "shell",
+      "command": "make",
+      "args": ["docker-build"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Build Docker container image"
+    },
+    {
+      "label": "docker: Start Development Stack",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["up", "-d"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Start development services with Docker Compose"
+    },
+    {
+      "label": "docker: Stop Development Stack",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["down"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Stop development services"
+    },
+    {
+      "label": "docs: Generate Documentation",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["doc", "--all-features", "--open"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Generate and open API documentation"
+    },
+    {
+      "label": "cli: Run Help",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["run", "--bin", "zkp-ledger", "--", "--help"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Show CLI help information"
+    },
+    {
+      "label": "cli: Initialize Ledger",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["run", "--bin", "zkp-ledger", "--", "init", "--project", "development"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "Initialize a new ZKP ledger for development"
+    },
+    {
+      "label": "clean: Full Clean",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["clean"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Clean all build artifacts"
+    }
+  ]
+}
