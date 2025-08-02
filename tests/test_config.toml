@@ -1,0 +1,90 @@
+# Test Configuration for ZKP Dataset Ledger
+# This file contains test-specific configuration values
+
+[testing]
+# Global test settings
+deterministic_rng = true
+log_level = "debug" 
+timeout_seconds = 30
+parallel_execution = true
+
+# Test data configuration
+max_test_dataset_size = 10000
+test_data_path = "tests/fixtures/data/"
+temp_dir_prefix = "zkp_test_"
+
+[ledger.test]
+# Test ledger configuration
+name = "test-ledger"
+hash_algorithm = "sha3-256"
+proof_system = "groth16"
+storage_backend = "memory"
+
+[storage.test]
+# Test storage configuration
+backend = "memory"
+# For integration tests that need persistence:
+rocksdb_path = "./test_data/rocksdb/"
+postgres_url = "postgresql://test_user:test_pass@localhost:5432/zkp_test"
+
+[proof.test]
+# Test proof configuration
+curve = "bls12-381"
+security_level = 128
+parallel_prove = false  # Disable for deterministic test results
+cache_size_mb = 64
+skip_heavy_operations = false
+
+[crypto.test]
+# Cryptographic test settings
+use_test_trusted_setup = true
+trusted_setup_path = "tests/fixtures/trusted_setup/"
+enable_debug_constraints = true
+
+[performance.test]
+# Performance test targets and thresholds
+max_proof_generation_ms = 5000  # 5 seconds for 1M rows
+max_verification_ms = 100       # 100ms verification
+max_memory_mb = 2048           # 2GB for 1GB dataset
+benchmark_iterations = 10
+benchmark_warmup = 3
+
+[integration.test]
+# Integration test configuration
+cli_binary_path = "target/debug/zkp-ledger"
+test_timeout_minutes = 5
+cleanup_after_test = true
+
+[property.test]
+# Property-based test configuration
+proptest_cases = 100
+proptest_max_shrink_iters = 10000
+proptest_timeout_ms = 30000
+
+[fixtures]
+# Test fixture configuration
+generate_large_datasets = false  # Set to true for performance testing
+dataset_sizes = [10, 100, 1000]
+csv_variants = ["simple", "statistical", "malformed", "empty"]
+proof_types = ["basic", "statistical", "privacy"]
+
+[coverage]
+# Code coverage configuration
+target_coverage_percent = 90
+exclude_paths = [
+    "tests/",
+    "benches/", 
+    "examples/",
+    "src/bin/",
+]
+coverage_format = "html"
+output_path = "target/coverage/"
+
+[ci]
+# Continuous integration test settings
+run_property_tests = true
+run_benchmark_tests = false  # Disable in CI for speed
+run_integration_tests = true
+run_e2e_tests = true
+fail_on_coverage_drop = true
+coverage_threshold = 85
