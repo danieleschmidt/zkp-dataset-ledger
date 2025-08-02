@@ -1,0 +1,155 @@
+# Test configuration for ZKP Dataset Ledger
+# This file contains settings specific to testing environments
+
+[test_environment]
+name = "zkp-ledger-tests"
+log_level = "debug"
+enable_timing = true
+enable_memory_tracking = true
+
+[test_performance]
+# Performance test thresholds
+max_proof_time_ms = 5000
+max_verification_time_ms = 100
+max_ledger_init_time_ms = 1000
+
+# Dataset size limits for tests
+small_dataset_rows = 100
+medium_dataset_rows = 10000
+large_dataset_rows = 100000
+
+# Memory limits for testing
+max_memory_usage_mb = 2048
+streaming_threshold_mb = 100
+
+[test_data]
+# Test data generation settings
+temp_dir_prefix = "zkp_test_"
+cleanup_temp_files = true
+preserve_large_datasets = false
+
+# Sample data configurations
+csv_delimiter = ","
+include_headers = true
+include_nulls = true
+random_seed = 42
+
+[test_crypto]
+# Cryptographic test settings
+use_mock_proofs = false
+mock_proof_delay_ms = 10
+force_real_crypto = false
+
+# Test curves and algorithms
+test_curves = ["bls12-381"]
+test_hash_algorithms = ["sha3-256", "blake3"]
+test_proof_systems = ["groth16"]
+
+[test_storage]
+# Storage backend testing
+test_rocksdb = true
+test_postgres = false # Requires database setup
+cleanup_storage = true
+
+# Storage test configurations
+temp_storage_size_mb = 100
+max_storage_operations = 1000
+
+[test_concurrent]
+# Concurrency testing settings
+max_concurrent_operations = 10
+concurrent_test_timeout_s = 60
+enable_race_detection = true
+
+[test_integration]
+# Integration test settings
+enable_cli_tests = true
+enable_api_tests = true
+enable_export_tests = true
+
+# External dependencies
+require_postgres = false
+require_mlflow = false
+require_jupyter = false
+
+[test_benchmarks]
+# Benchmark test settings
+enable_benchmarks = true
+benchmark_iterations = 100
+benchmark_warmup_iterations = 10
+
+# Benchmark thresholds
+proof_generation_target_ms = 2000
+verification_target_ms = 50
+dataset_loading_target_ms = 1000
+
+[test_coverage]
+# Code coverage settings
+min_coverage_percent = 90
+exclude_patterns = [
+    "tests/*",
+    "benches/*",
+    "examples/*",
+    "target/*"
+]
+
+# Coverage report formats
+html_report = true
+json_report = true
+lcov_report = false
+
+[test_property]
+# Property-based testing settings
+enable_property_tests = true
+property_test_cases = 1000
+max_shrink_iterations = 100
+
+# Property test configurations
+max_dataset_size = 10000
+max_string_length = 1000
+max_array_length = 100
+
+[test_regression]
+# Regression testing settings
+enable_regression_tests = true
+regression_data_dir = "tests/regression_data"
+baseline_performance_file = "performance_baseline.json"
+
+# Regression thresholds
+max_performance_regression_percent = 20
+max_memory_regression_percent = 15
+
+[test_security]
+# Security testing settings
+enable_security_tests = true
+enable_timing_attack_tests = true
+enable_fault_injection = false
+
+# Security test parameters
+timing_samples = 1000
+timing_variance_threshold = 2.0
+memory_leak_threshold_mb = 10
+
+[test_compliance]
+# Compliance testing settings
+enable_gdpr_tests = true
+enable_hipaa_tests = false
+enable_sox_tests = false
+
+[test_documentation]
+# Documentation testing
+test_code_examples = true
+test_readme_examples = true
+test_api_documentation = true
+check_broken_links = true
+
+[test_ci]
+# CI/CD specific settings
+parallel_test_execution = true
+test_timeout_minutes = 30
+artifact_retention_days = 7
+
+# Test categorization for CI
+fast_tests_only = false
+skip_long_running_tests = false
+skip_network_tests = true
