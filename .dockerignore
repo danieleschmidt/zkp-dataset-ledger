@@ -1,0 +1,89 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+ARCHITECTURE.md
+PROJECT_CHARTER.md
+CHANGELOG.md
+README.md
+IMPLEMENTATION-ROADMAP.md
+
+# CI/CD
+.github/
+.vscode/
+.devcontainer/
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+target/debug/
+target/doc/
+
+# Testing
+test-data/
+tests/fixtures/data/
+coverage/
+*.profraw
+lcov.info
+
+# Benchmarking
+/criterion/
+/target/criterion/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Security (should never be in Docker anyway)
+*.key
+*.pem
+*.p12
+private-keys/
+
+# Local development
+ledger-data/
+*.db
+*.sqlite
+
+# Python (for bindings)
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+*.egg-info/
+
+# Build artifacts that aren't needed
+*.o
+*.a
+*.so
+*.dylib
+
+# Large test files
+*.csv
+*.json
+!examples/*.csv
+!examples/*.json
