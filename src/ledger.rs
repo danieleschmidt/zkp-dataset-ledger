@@ -1,4 +1,4 @@
-use crate::{Dataset, Proof, ProofConfig, LedgerError, Result};
+use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -32,7 +32,7 @@ impl Ledger {
             entries: HashMap::new(),
         })
     }
-    
+
     pub fn notarize_dataset(
         &mut self,
         dataset: Dataset,
@@ -40,7 +40,7 @@ impl Ledger {
         config: ProofConfig,
     ) -> Result<Proof> {
         let proof = Proof::generate(&dataset, &config)?;
-        
+
         let entry = LedgerEntry {
             dataset_name: name.to_string(),
             dataset_hash: dataset.compute_hash(),
@@ -49,15 +49,15 @@ impl Ledger {
             operation: Operation::Notarize,
             timestamp: chrono::Utc::now(),
         };
-        
+
         self.entries.insert(name.to_string(), entry);
         Ok(proof)
     }
-    
+
     pub fn verify_proof(&self, proof: &Proof) -> Result<bool> {
         proof.verify()
     }
-    
+
     pub fn get_dataset_history(&self, name: &str) -> Result<Vec<&LedgerEntry>> {
         // TODO: Implement proper chain traversal
         Ok(self.entries.get(name).map(|e| vec![e]).unwrap_or_default())

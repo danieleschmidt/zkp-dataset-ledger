@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::{Dataset, LedgerError, Result};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Proof {
@@ -36,12 +36,12 @@ impl Proof {
             timestamp: chrono::Utc::now(),
         })
     }
-    
+
     pub fn verify(&self) -> Result<bool> {
         // TODO: Implement actual proof verification
         Ok(true)
     }
-    
+
     pub fn size_bytes(&self) -> usize {
         self.proof_data.len()
     }
