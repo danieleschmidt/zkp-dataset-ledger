@@ -1,0 +1,115 @@
+{
+    "name": "ZKP Dataset Ledger Development",
+    "dockerFile": "../Dockerfile.dev",
+    
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "rust-analyzer.checkOnSave.command": "clippy",
+                "rust-analyzer.cargo.features": "all",
+                "rust-analyzer.procMacro.enable": true,
+                "files.watcherExclude": {
+                    "**/target/**": true,
+                    "**/.git/**": true
+                },
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "rust-lang.rust-analyzer",
+                "[toml]": {
+                    "editor.defaultFormatter": "tamasfe.even-better-toml"
+                },
+                "[yaml]": {
+                    "editor.defaultFormatter": "redhat.vscode-yaml"
+                },
+                "[json]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "[markdown]": {
+                    "editor.defaultFormatter": "yzhang.markdown-all-in-one"
+                }
+            },
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb",
+                "serayuzgur.crates",
+                "tamasfe.even-better-toml",
+                "redhat.vscode-yaml",
+                "esbenp.prettier-vscode",
+                "yzhang.markdown-all-in-one",
+                "ms-vscode.test-adapter-converter",
+                "hbenl.vscode-test-explorer",
+                "swellaby.vscode-rust-test-adapter",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "github.copilot",
+                "ms-vscode.vscode-json",
+                "streetsidesoftware.code-spell-checker",
+                "johnpapa.vscode-peacock"
+            ]
+        }
+    },
+
+    "forwardPorts": [8080, 5432, 3000],
+    "portsAttributes": {
+        "8080": {
+            "label": "API Server",
+            "onAutoForward": "notify"
+        },
+        "5432": {
+            "label": "PostgreSQL",
+            "onAutoForward": "silent"
+        },
+        "3000": {
+            "label": "Documentation",
+            "onAutoForward": "openBrowser"
+        }
+    },
+
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "installOhMyZsh": true,
+            "upgradePackages": true,
+            "username": "vscode",
+            "userUid": "1000",
+            "userGid": "1000"
+        },
+        "ghcr.io/devcontainers/features/rust:1": {
+            "version": "1.75",
+            "profile": "default"
+        },
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.11",
+            "installTools": true
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "18",
+            "nodeGypDependencies": true
+        },
+        "ghcr.io/eitsupi/devcontainer-features/jq:2": {},
+        "ghcr.io/meaningful-ooo/devcontainer-features/fish:1": {}
+    },
+
+    "containerEnv": {
+        "RUST_LOG": "debug",
+        "RUST_BACKTRACE": "1",
+        "DATABASE_URL": "postgresql://zkp_user:zkp_password@localhost:5432/zkp_ledger_dev"
+    },
+
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "postAttachCommand": "echo 'ZKP Dataset Ledger development environment ready! 🚀'",
+
+    "remoteUser": "vscode",
+    "workspaceFolder": "/workspace",
+    
+    "mounts": [
+        "source=${localWorkspaceFolder}/.git,target=/workspace/.git,type=bind",
+        "source=zkp-ledger-cargo-cache,target=/usr/local/cargo/registry,type=volume",
+        "source=zkp-ledger-target-cache,target=/workspace/target,type=volume"
+    ],
+
+    "runArgs": [
+        "--cap-add=SYS_PTRACE",
+        "--security-opt", "seccomp=unconfined",
+        "--init"
+    ]
+}

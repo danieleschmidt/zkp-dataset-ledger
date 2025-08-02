@@ -1,0 +1,129 @@
+# Prometheus configuration for ZKP Dataset Ledger monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'zkp-dataset-ledger'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "rules/*.yml"
+
+# Scrape configuration
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ZKP Dataset Ledger application
+  - job_name: 'zkp-dataset-ledger'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    honor_labels: true
+    metric_relabel_configs:
+      # Add service label
+      - target_label: service
+        replacement: zkp-dataset-ledger
+      # Rename ZKP-specific metrics
+      - source_labels: [__name__]
+        regex: 'zkp_(.*)'
+        target_label: __name__
+        replacement: 'zkp_dataset_ledger_${1}'
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'node_(.*)'
+        target_label: __name__
+        replacement: 'system_${1}'
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_(.*)'
+        target_label: __name__
+        replacement: 'container_${1}'
+
+  # Pushgateway for batch jobs
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['pushgateway:9091']
+    honor_labels: true
+    scrape_interval: 30s
+
+  # BlackBox Exporter for external monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - http://prometheus:9090
+        - http://grafana:3000
+        - http://jaeger:16686
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # PostgreSQL Exporter (if using postgres backend)
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Redis Exporter
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "http://remote-storage:9201/write"
+    write_relabel_configs:
+      # Only send important metrics to remote storage
+      - source_labels: [__name__]
+        regex: '(zkp_dataset_ledger_.*|up|node_.*)'
+        action: keep
+
+# Storage configuration
+storage:
+  tsdb:
+    # Retention policies
+    retention.time: 30d
+    retention.size: 5GB
+    
+    # Compression
+    wal-compression: true
+    
+    # Performance tuning
+    min-block-duration: 2h
+    max-block-duration: 25h

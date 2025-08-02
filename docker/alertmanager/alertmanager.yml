@@ -1,0 +1,214 @@
+# AlertManager configuration for ZKP Dataset Ledger
+
+global:
+  # Global SMTP settings
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alertmanager@zkp-dataset-ledger.org'
+  smtp_auth_username: 'alertmanager@zkp-dataset-ledger.org'
+  smtp_auth_password: 'password'
+  
+  # Global Slack settings
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alerts
+route:
+  # Default route
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+  
+  # Specific routes for different alert types
+  routes:
+    # Critical ZKP operations
+    - match:
+        severity: critical
+        service: zkp-dataset-ledger
+      receiver: 'zkp-critical'
+      group_wait: 0s
+      repeat_interval: 5m
+      
+    # Performance alerts
+    - match_re:
+        alertname: '(SlowProofGeneration|HighMemoryUsage|DiskSpaceLow)'
+      receiver: 'performance-team'
+      group_wait: 30s
+      repeat_interval: 30m
+      
+    # Security alerts
+    - match_re:
+        alertname: '(HighVerificationFailureRate|UnauthorizedAccess|StorageIntegrityViolation)'
+      receiver: 'security-team'
+      group_wait: 0s
+      repeat_interval: 5m
+      
+    # Infrastructure alerts
+    - match:
+        category: infrastructure
+      receiver: 'infrastructure-team'
+      group_wait: 1m
+      repeat_interval: 1h
+      
+    # Development alerts (non-production)
+    - match:
+        environment: development
+      receiver: 'dev-team'
+      group_wait: 5m
+      repeat_interval: 2h
+
+# Inhibition rules to reduce noise
+inhibit_rules:
+  # Inhibit lower severity alerts when higher severity is firing
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'service', 'instance']
+    
+  # Inhibit proof generation slow alert when service is down
+  - source_match:
+      alertname: ServiceDown
+    target_match_re:
+      alertname: '(SlowProofGeneration|HighMemoryUsage)'
+    equal: ['service', 'instance']
+
+# Receivers define how to send notifications
+receivers:
+  # Default receiver (catch-all)
+  - name: 'default-receiver'
+    slack_configs:
+      - channel: '#alerts'
+        title: 'ZKP Dataset Ledger Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        send_resolved: true
+
+  # Critical ZKP operations alerts
+  - name: 'zkp-critical'
+    slack_configs:
+      - channel: '#zkp-critical'
+        title: '🚨 CRITICAL: ZKP Operation Alert'
+        text: |
+          {{ range .Alerts }}
+          *CRITICAL ALERT*
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+        send_resolved: true
+        color: 'danger'
+    
+    email_configs:
+      - to: 'oncall@zkp-dataset-ledger.org'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+        body: |
+          Critical alert fired for ZKP Dataset Ledger:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Runbook: {{ .Annotations.runbook_url }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+        
+    webhook_configs:
+      - url: 'http://pagerduty.com/webhook'
+        send_resolved: true
+
+  # Performance team alerts
+  - name: 'performance-team'
+    slack_configs:
+      - channel: '#performance'
+        title: '⚠️ Performance Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Performance Issue Detected*
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+
+  # Security team alerts
+  - name: 'security-team'
+    slack_configs:
+      - channel: '#security-alerts'
+        title: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *SECURITY ALERT*
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+        color: 'danger'
+    
+    email_configs:
+      - to: 'security@zkp-dataset-ledger.org'
+        subject: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Security alert for ZKP Dataset Ledger:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+  # Infrastructure team alerts
+  - name: 'infrastructure-team'
+    slack_configs:
+      - channel: '#infrastructure'
+        title: '🖥️ Infrastructure Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Infrastructure Issue*
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        send_resolved: true
+
+  # Development team alerts
+  - name: 'dev-team'
+    slack_configs:
+      - channel: '#dev-alerts'
+        title: '🔧 Development Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Development Environment Alert*
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        send_resolved: true
+        color: 'good'

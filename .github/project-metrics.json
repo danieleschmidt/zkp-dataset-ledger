@@ -1,0 +1,56 @@
+{
+  "project": {
+    "name": "ZKP Dataset Ledger",
+    "description": "Zero-knowledge proof ledger for cryptographic dataset provenance",
+    "repository": "danieleschmidt/zkp-dataset-ledger",
+    "license": "Apache-2.0",
+    "language": "Rust",
+    "created": "2024-08-02",
+    "last_updated": "2024-08-02"
+  },
+  "metrics": {
+    "code_quality": {
+      "target_test_coverage": 90,
+      "target_documentation_coverage": 85,
+      "max_complexity_score": 10,
+      "max_technical_debt_ratio": 0.1
+    },
+    "performance": {
+      "max_proof_generation_time_seconds": 5,
+      "max_verification_time_milliseconds": 100,
+      "max_memory_usage_gb": 4,
+      "min_throughput_ops_per_second": 10
+    },
+    "security": {
+      "max_critical_vulnerabilities": 0,
+      "max_high_vulnerabilities": 2,
+      "security_scan_frequency_days": 1,
+      "dependency_update_frequency_days": 7
+    },
+    "reliability": {
+      "target_uptime_percentage": 99.9,
+      "max_error_rate_percentage": 1,
+      "max_response_time_p95_seconds": 2,
+      "recovery_time_objective_minutes": 15
+    }
+  },
+  "automation": {
+    "ci_cd": {
+      "build_time_target_minutes": 10,
+      "test_execution_time_target_minutes": 15,
+      "deployment_frequency": "continuous",
+      "release_frequency": "monthly"
+    },
+    "monitoring": {
+      "alert_response_time_target_minutes": 5,
+      "incident_resolution_time_target_hours": 4,
+      "monitoring_coverage_percentage": 95
+    }
+  },
+  "tracking": {
+    "enabled": true,
+    "collection_interval_minutes": 5,
+    "retention_period_days": 90,
+    "export_formats": ["json", "prometheus", "csv"]
+  }
+}

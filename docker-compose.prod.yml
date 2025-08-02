@@ -1,0 +1,325 @@
+# Production Docker Compose configuration
+# Security-hardened setup for production deployments
+
+version: '3.8'
+
+services:
+  zkp-ledger:
+    build:
+      context: .
+      dockerfile: Dockerfile.security
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: zkp-dataset-ledger:production
+    container_name: zkp-ledger-prod
+    restart: unless-stopped
+    
+    # Security settings
+    read_only: true
+    user: "65532:65532"  # nonroot user from distroless
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5' 
+          memory: 1G
+    
+    # Environment (use secrets in production)
+    environment:
+      - RUST_LOG=info
+      - LEDGER_ENVIRONMENT=production
+      - STORAGE_BACKEND=postgres
+      - DATABASE_URL_FILE=/run/secrets/db_url
+      - TLS_ENABLED=true
+      - METRICS_ENABLED=true
+      - AUDIT_LOG_ENABLED=true
+    
+    # Secrets management
+    secrets:
+      - db_url
+      - tls_cert
+      - tls_key
+      - api_key
+    
+    # Read-only volume mounts
+    volumes:
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+          mode: 1777
+      - type: bind
+        source: ./config/production.toml
+        target: /etc/zkp-ledger/config.toml
+        read_only: true
+      - ledger_data:/data:rw
+    
+    # Network configuration
+    networks:
+      - zkp-internal
+      - zkp-external
+    
+    # Port binding (use reverse proxy in production)
+    expose:
+      - "8080"
+    
+    # Health check
+    healthcheck:
+      test: ["/usr/local/bin/zkp-ledger", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=zkp-ledger,environment=production"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zkp-postgres-prod
+    restart: unless-stopped
+    
+    # Security settings
+    user: postgres
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    
+    # Environment with secrets
+    environment:
+      - POSTGRES_DB=zkp_ledger_prod
+      - POSTGRES_USER=zkpuser
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - POSTGRES_INITDB_ARGS=--auth-local=peer --auth-host=scram-sha-256
+    
+    # Secrets
+    secrets:
+      - postgres_password
+    
+    # Persistent storage
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+      - type: bind
+        source: ./docker/postgresql.prod.conf
+        target: /etc/postgresql/postgresql.conf
+        read_only: true
+      - type: bind
+        source: ./docker/init-prod.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
+    
+    # Network isolation
+    networks:
+      - zkp-internal
+    
+    # No exposed ports (internal only)
+    expose:
+      - "5432"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zkpuser -d zkp_ledger_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    # Command with custom config
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: zkp-nginx-prod
+    restart: unless-stopped
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    
+    # Configuration
+    volumes:
+      - type: bind
+        source: ./docker/nginx.prod.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+      - type: bind
+        source: ./docker/ssl/
+        target: /etc/nginx/ssl/
+        read_only: true
+      - type: tmpfs
+        target: /var/cache/nginx
+        tmpfs:
+          size: 100M
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          size: 100M
+    
+    # Secrets for SSL
+    secrets:
+      - nginx_cert
+      - nginx_key
+    
+    # Port configuration
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    # Networks
+    networks:
+      - zkp-external
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    depends_on:
+      - zkp-ledger
+
+  # Monitoring and observability
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: zkp-prometheus
+    restart: unless-stopped
+    
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"
+    
+    volumes:
+      - type: bind
+        source: ./docker/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - prometheus_data:/prometheus:rw
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    
+    networks:
+      - zkp-internal
+    
+    expose:
+      - "9090"
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: zkp-grafana
+    restart: unless-stopped
+    
+    security_opt:
+      - no-new-privileges:true
+    user: "472:472"
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    
+    secrets:
+      - grafana_password
+    
+    volumes:
+      - grafana_data:/var/lib/grafana:rw
+      - type: bind
+        source: ./docker/grafana/
+        target: /etc/grafana/provisioning/
+        read_only: true
+    
+    networks:
+      - zkp-internal
+      - zkp-external
+    
+    expose:
+      - "3000"
+
+# Secrets (use external secrets in production)
+secrets:
+  db_url:
+    external: true
+  postgres_password:
+    external: true
+  tls_cert:
+    external: true
+  tls_key:
+    external: true
+  api_key:
+    external: true
+  nginx_cert:
+    external: true
+  nginx_key:
+    external: true
+  grafana_password:
+    external: true
+
+# Persistent volumes
+volumes:
+  ledger_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/data
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/postgres
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Network segmentation
+networks:
+  zkp-internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  zkp-external:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24

@@ -1,0 +1,178 @@
+# Development Dockerfile for ZKP Dataset Ledger
+FROM mcr.microsoft.com/devcontainers/rust:1-1-bullseye
+
+# Install system dependencies
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+        # Build essentials
+        build-essential \
+        cmake \
+        clang \
+        llvm \
+        pkg-config \
+        libssl-dev \
+        # Database support
+        postgresql-client \
+        libpq-dev \
+        # Development tools
+        git \
+        curl \
+        wget \
+        jq \
+        htop \
+        tree \
+        # Python development
+        python3-pip \
+        python3-venv \
+        python3-dev \
+        # Node.js for documentation tools
+        nodejs \
+        npm \
+        # Additional utilities
+        unzip \
+        zip \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+    && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# Install Rust components
+USER vscode
+RUN rustup component add rustfmt clippy llvm-tools-preview \
+    && rustup target add wasm32-unknown-unknown
+
+# Install additional Rust tools for development
+RUN cargo install --locked \
+    cargo-watch \
+    cargo-edit \
+    cargo-audit \
+    cargo-tarpaulin \
+    cargo-outdated \
+    cargo-tree \
+    cargo-expand \
+    cargo-udeps \
+    cargo-deny \
+    cargo-make \
+    flamegraph \
+    criterion-table \
+    mdbook \
+    mdbook-mermaid \
+    mdbook-toc
+
+# Install Python development tools
+RUN pip3 install --user --no-cache-dir \
+    maturin[patchelf] \
+    pytest \
+    pytest-cov \
+    pytest-benchmark \
+    black \
+    isort \
+    mypy \
+    polars \
+    pandas \
+    numpy \
+    jupyter \
+    matplotlib \
+    seaborn \
+    scikit-learn \
+    pre-commit
+
+# Install Node.js development tools
+RUN npm install -g \
+    @mermaid-js/mermaid-cli \
+    markdownlint-cli2 \
+    prettier \
+    typescript
+
+# Set up development environment
+WORKDIR /workspace
+
+# Configure Git for development
+RUN git config --global init.defaultBranch main \
+    && git config --global pull.rebase false \
+    && git config --global core.editor "code --wait"
+
+# Set environment variables for development
+ENV RUST_LOG=debug
+ENV RUST_BACKTRACE=1
+ENV CARGO_INCREMENTAL=1
+ENV CARGO_TARGET_DIR=/workspace/target
+
+# Create development directories
+RUN mkdir -p /home/vscode/.cargo/registry \
+    && mkdir -p /workspace/target \
+    && mkdir -p /workspace/dev-ledger-data \
+    && mkdir -p /workspace/test-data \
+    && mkdir -p /workspace/benchmark-results
+
+# Ensure proper permissions
+RUN sudo chown -R vscode:vscode /home/vscode/.cargo \
+    && sudo chown -R vscode:vscode /workspace
+
+# Add local cargo bin to PATH
+ENV PATH="/home/vscode/.cargo/bin:${PATH}"
+
+# Install PostgreSQL for development database
+USER root
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y postgresql-14 postgresql-client-14 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure PostgreSQL for development
+RUN mkdir -p /var/lib/postgresql/data \
+    && chown -R postgres:postgres /var/lib/postgresql \
+    && sudo -u postgres initdb -D /var/lib/postgresql/data \
+    && echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf \
+    && echo "listen_addresses='*'" >> /var/lib/postgresql/data/postgresql.conf \
+    && echo "port = 5432" >> /var/lib/postgresql/data/postgresql.conf
+
+# Create PostgreSQL startup script
+RUN echo '#!/bin/bash\nsudo -u postgres pg_ctl -D /var/lib/postgresql/data -l /var/lib/postgresql/data/log start' > /usr/local/bin/start-postgres \
+    && chmod +x /usr/local/bin/start-postgres
+
+# Switch back to vscode user
+USER vscode
+
+# Create useful development aliases and functions
+RUN echo 'alias zkp-dev="cargo watch -x \"build --all-features\""' >> ~/.bashrc \
+    && echo 'alias zkp-test="cargo test --all-features --workspace"' >> ~/.bashrc \
+    && echo 'alias zkp-bench="cargo bench --all-features"' >> ~/.bashrc \
+    && echo 'alias zkp-check="make check"' >> ~/.bashrc \
+    && echo 'alias zkp-audit="cargo audit && cargo deny check"' >> ~/.bashrc \
+    && echo 'alias zkp-coverage="cargo tarpaulin --all-features --workspace --out Html"' >> ~/.bashrc \
+    && echo 'alias zkp-docs="cargo doc --all-features --workspace --open"' >> ~/.bashrc
+
+# Create development helper script
+RUN echo '#!/bin/bash\n\
+echo "🚀 ZKP Dataset Ledger Development Environment"\n\
+echo "==============================================="\n\
+echo "Rust version: $(rustc --version)"\n\
+echo "Cargo version: $(cargo --version)"\n\
+echo "Python version: $(python3 --version)"\n\
+echo "Node version: $(node --version)"\n\
+echo ""\n\
+echo "Available commands:"\n\
+echo "  zkp-dev      - Watch and build on changes"\n\
+echo "  zkp-test     - Run all tests"\n\
+echo "  zkp-bench    - Run benchmarks"\n\
+echo "  zkp-check    - Run full quality checks"\n\
+echo "  zkp-audit    - Run security audit"\n\
+echo "  zkp-coverage - Generate test coverage report"\n\
+echo "  zkp-docs     - Build and open documentation"\n\
+echo ""\n\
+echo "Development directories:"\n\
+echo "  /workspace/test-data/        - Sample datasets"\n\
+echo "  /workspace/dev-ledger-data/  - Development ledger storage"\n\
+echo "  /workspace/benchmark-results/ - Benchmark outputs"\n\
+echo ""\n\
+echo "Happy coding! 🦀"\n' > /usr/local/bin/zkp-env-info \
+    && sudo chmod +x /usr/local/bin/zkp-env-info
+
+# Expose common development ports
+EXPOSE 8080 5432 3000 8000
+
+# Set the default command
+CMD ["/bin/bash"]
