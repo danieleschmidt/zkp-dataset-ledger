@@ -14,15 +14,15 @@ readme = "README.md"
 
 [dependencies]
 # Core ZK and cryptographic libraries
-ark-bls12-381 = "0.4"
-ark-groth16 = "0.4"
-ark-std = "0.4"
-ark-ff = "0.4"
-ark-ec = "0.4"
-ark-poly = "0.4"
-ark-relations = "0.4"
-ark-r1cs-std = "0.4"
-ark-crypto-primitives = "0.4"
+ark-bls12-381 = "0.5"
+ark-groth16 = "0.5"
+ark-std = "0.5"
+ark-ff = "0.5"
+ark-ec = "0.5"
+ark-poly = "0.5"
+ark-relations = "0.5"
+ark-r1cs-std = "0.5"
+ark-crypto-primitives = "0.5"
 
 # Merkle tree and hashing
 merkletree = "0.23"
