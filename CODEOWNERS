@@ -1,0 +1,57 @@
+# Code owners for ZKP Dataset Ledger
+# This file defines who owns different parts of the codebase
+
+# Global fallback
+* @terragon/core-team
+
+# Core cryptographic code
+/src/crypto/ @terragon/crypto-team @terragon/security-team
+/src/circuits.rs @terragon/crypto-team
+/src/proof.rs @terragon/crypto-team
+
+# Storage and ledger implementation
+/src/ledger.rs @terragon/backend-team
+/src/storage.rs @terragon/backend-team
+/src/dataset.rs @terragon/backend-team
+
+# CLI and API interfaces
+/src/bin/ @terragon/frontend-team
+/examples/ @terragon/frontend-team
+
+# Testing infrastructure
+/tests/ @terragon/qa-team
+/benches/ @terragon/performance-team
+
+# Documentation
+*.md @terragon/docs-team
+/docs/ @terragon/docs-team
+
+# Configuration files
+Cargo.toml @terragon/core-team
+Cargo.lock @terragon/core-team
+*.toml @terragon/devops-team
+
+# Build and deployment
+Dockerfile* @terragon/devops-team
+docker-compose*.yml @terragon/devops-team
+/docker/ @terragon/devops-team
+Makefile @terragon/devops-team
+build.sh @terragon/devops-team
+
+# CI/CD workflows
+/.github/ @terragon/devops-team
+/scripts/ @terragon/devops-team
+
+# Security-sensitive files
+/deny.toml @terragon/security-team
+/audit.toml @terragon/security-team
+SECURITY.md @terragon/security-team
+
+# Monitoring and observability
+/observability.toml @terragon/sre-team
+/telemetry.toml @terragon/sre-team
+/docker-compose.monitoring.yml @terragon/sre-team
+
+# Legal and compliance
+LICENSE @terragon/legal-team
+CODE_OF_CONDUCT.md @terragon/legal-team
