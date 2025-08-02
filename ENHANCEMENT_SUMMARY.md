@@ -16,9 +16,9 @@ Implemented **context-aware SDLC improvements** for ZKP Dataset Ledger based on 
 ## ✅ Implemented Enhancements
 
 ### 1. **CI/CD Pipeline Automation** 🚀
-**Files Added**:
-- `.github/workflows/ci.yml` - Comprehensive testing pipeline
-- `.github/workflows/release.yml` - Automated publishing workflow
+**Files Created** (Manual setup required - see `WORKFLOW_SETUP.md`):
+- `.github-workflows-to-create/ci.yml` - Comprehensive testing pipeline
+- `.github-workflows-to-create/release.yml` - Automated publishing workflow
 
 **Features**:
 - Multi-Rust version testing (stable, beta)
