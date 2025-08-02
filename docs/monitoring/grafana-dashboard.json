@@ -1,0 +1,305 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "ZKP Dataset Ledger - Operations Dashboard",
+    "tags": ["zkp", "ledger", "cryptography", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"zkp-ledger\"}",
+            "legendFormat": "Service Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "DOWN"}}, "type": "value"},
+              {"options": {"1": {"text": "UP"}}, "type": "value"}
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Proof Generation Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(zkp_proofs_generated_total[5m])",
+            "legendFormat": "Proofs/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Proofs per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Proof Generation Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, zkp_proof_generation_duration_seconds)",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, zkp_proof_generation_duration_seconds)",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, zkp_proof_generation_duration_seconds)",
+            "legendFormat": "99th percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Verification Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, zkp_verification_duration_seconds)",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "rate(zkp_verifications_total[5m])",
+            "legendFormat": "Verifications/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph", 
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"zkp-ledger\"} / 1024 / 1024 / 1024",
+            "legendFormat": "RSS Memory (GB)"
+          },
+          {
+            "expr": "process_virtual_memory_bytes{job=\"zkp-ledger\"} / 1024 / 1024 / 1024",
+            "legendFormat": "Virtual Memory (GB)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory (GB)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Storage Operations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(zkp_storage_operations_total{status=\"success\"}[5m])",
+            "legendFormat": "Successful ops/sec"
+          },
+          {
+            "expr": "rate(zkp_storage_operations_total{status=\"error\"}[5m])",
+            "legendFormat": "Failed ops/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Operations per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Active Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "zkp_database_connections_active",
+            "legendFormat": "Active DB connections"
+          },
+          {
+            "expr": "zkp_api_connections_active", 
+            "legendFormat": "Active API connections"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Connections",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Error Rates",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(zkp_proof_generation_errors_total[5m])",
+            "legendFormat": "Proof generation errors/sec"
+          },
+          {
+            "expr": "rate(zkp_verification_failures_total[5m])",
+            "legendFormat": "Verification failures/sec"
+          },
+          {
+            "expr": "rate(zkp_storage_errors_total[5m])",
+            "legendFormat": "Storage errors/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Errors per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Dataset Processing Stats",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "zkp_datasets_processed_total",
+            "legendFormat": "Total Datasets Processed",
+            "format": "table"
+          },
+          {
+            "expr": "zkp_proofs_generated_total",
+            "legendFormat": "Total Proofs Generated",
+            "format": "table"
+          },
+          {
+            "expr": "zkp_verifications_total",
+            "legendFormat": "Total Verifications",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
+      },
+      {
+        "id": 10,
+        "title": "Cryptographic Operations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(zkp_hash_operations_total[5m])",
+            "legendFormat": "Hash operations/sec"
+          },
+          {
+            "expr": "rate(zkp_merkle_operations_total[5m])",
+            "legendFormat": "Merkle tree operations/sec"
+          },
+          {
+            "expr": "rate(zkp_circuit_operations_total[5m])",
+            "legendFormat": "Circuit operations/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Operations per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40}
+      },
+      {
+        "id": 11,
+        "title": "Queue Depths",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "zkp_proof_queue_depth",
+            "legendFormat": "Proof generation queue"
+          },
+          {
+            "expr": "zkp_verification_queue_depth",
+            "legendFormat": "Verification queue"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Queue depth",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"zkp-ledger\"}, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "backend",
+          "type": "query", 
+          "query": "label_values(zkp_storage_operations_total, backend)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "expr": "zkp_deployment_info",
+          "textField": "version",
+          "titleField": "Deployment"
+        }
+      ]
+    }
+  }
+}

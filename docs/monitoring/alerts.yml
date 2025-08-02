@@ -1,0 +1,189 @@
+# Alerting rules for ZKP Dataset Ledger
+groups:
+  - name: zkp-ledger-critical
+    interval: 30s
+    rules:
+      # Service availability
+      - alert: ZKPLedgerDown
+        expr: up{job="zkp-ledger"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: zkp-ledger
+        annotations:
+          summary: "ZKP Dataset Ledger is down"
+          description: "ZKP Dataset Ledger has been down for more than 1 minute"
+          runbook_url: "https://docs.company.com/runbooks/zkp-ledger-down"
+
+      # Proof generation performance
+      - alert: ProofGenerationSlow
+        expr: histogram_quantile(0.95, zkp_proof_generation_duration_seconds) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: proof-generation
+        annotations:
+          summary: "Proof generation is slow"
+          description: "95th percentile proof generation time is {{ $value }}s, above 10s threshold"
+          runbook_url: "https://docs.company.com/runbooks/slow-proof-generation"
+
+      # Memory usage
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes{job="zkp-ledger"} / 1024 / 1024 / 1024) > 8
+        for: 5m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: memory
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}GB, above 8GB threshold"
+          runbook_url: "https://docs.company.com/runbooks/high-memory-usage"
+
+      # Storage backend errors
+      - alert: StorageBackendErrors
+        expr: rate(zkp_storage_operations_total{status="error"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: zkp-ledger
+          component: storage
+        annotations:
+          summary: "Storage backend errors detected"
+          description: "Storage error rate is {{ $value }} errors/sec"
+          runbook_url: "https://docs.company.com/runbooks/storage-errors"
+
+  - name: zkp-ledger-performance
+    interval: 60s
+    rules:
+      # Verification performance
+      - alert: VerificationSlow
+        expr: histogram_quantile(0.95, zkp_verification_duration_seconds) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: zkp-ledger  
+          component: verification
+        annotations:
+          summary: "Proof verification is slow"
+          description: "95th percentile verification time is {{ $value }}s, above 500ms threshold"
+
+      # Queue depth
+      - alert: HighQueueDepth
+        expr: zkp_proof_queue_depth > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: queue
+        annotations:
+          summary: "Proof generation queue is deep"
+          description: "Queue depth is {{ $value }}, above 100 threshold"
+
+      # Transaction rate
+      - alert: LowTransactionRate
+        expr: rate(zkp_transactions_total[10m]) < 0.01
+        for: 15m
+        labels:
+          severity: info
+          service: zkp-ledger
+          component: transactions
+        annotations:
+          summary: "Low transaction rate"
+          description: "Transaction rate is {{ $value }} tx/sec, below expected threshold"
+
+  - name: zkp-ledger-security
+    interval: 60s 
+    rules:
+      # Failed verification attempts
+      - alert: HighVerificationFailures
+        expr: rate(zkp_verification_failures_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: security
+        annotations:
+          summary: "High verification failure rate"
+          description: "Verification failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.company.com/runbooks/verification-failures"
+
+      # Suspicious API activity
+      - alert: SuspiciousAPIActivity
+        expr: rate(zkp_api_requests_total{status=~"4..|5.."}[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value }} errors/sec"
+
+  - name: zkp-ledger-infrastructure
+    interval: 120s
+    rules:
+      # Database connection issues
+      - alert: DatabaseConnectionIssues  
+        expr: zkp_database_connections_active / zkp_database_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Using {{ $value | humanizePercentage }} of available database connections"
+
+      # Disk space
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/data"} / node_filesystem_size_bytes{mountpoint="/data"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: zkp-ledger
+          component: storage
+        annotations:
+          summary: "Low disk space on data volume"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook_url: "https://docs.company.com/runbooks/low-disk-space"
+
+      # Certificate expiration
+      - alert: CertificateExpiration
+        expr: (zkp_certificate_expiry_timestamp - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          service: zkp-ledger
+          component: tls
+        annotations:
+          summary: "TLS certificate expiring soon" 
+          description: "Certificate expires in {{ $value }} days"
+
+  - name: zkp-ledger-business
+    interval: 300s
+    rules:
+      # Dataset processing rate
+      - alert: LowDatasetProcessingRate
+        expr: rate(zkp_datasets_processed_total[1h]) < 0.001
+        for: 30m
+        labels:
+          severity: info
+          service: zkp-ledger
+          component: business
+        annotations:
+          summary: "Low dataset processing rate"
+          description: "Processing {{ $value }} datasets/sec, below expected rate"
+
+      # Proof success rate
+      - alert: LowProofSuccessRate
+        expr: (rate(zkp_proofs_generated_total{status="success"}[1h]) / rate(zkp_proofs_generated_total[1h])) < 0.95
+        for: 15m
+        labels: 
+          severity: warning
+          service: zkp-ledger
+          component: business
+        annotations:
+          summary: "Low proof generation success rate"
+          description: "Proof success rate is {{ $value | humanizePercentage }}, below 95% threshold"
