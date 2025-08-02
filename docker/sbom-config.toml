@@ -1,0 +1,124 @@
+# Software Bill of Materials (SBOM) configuration
+# Configuration for generating comprehensive SBOMs
+
+[metadata]
+tool = "cargo-cyclonedx"
+version = "0.4.0"
+timestamp = true
+serial_number = true
+
+[project]
+name = "zkp-dataset-ledger"
+version = "0.1.0"
+description = "Zero-knowledge proof ledger for dataset provenance"
+homepage = "https://github.com/zkp-dataset-ledger/zkp-dataset-ledger"
+repository = "https://github.com/zkp-dataset-ledger/zkp-dataset-ledger"
+license = "Apache-2.0"
+
+[output]
+format = "json"
+filename = "sbom.json"
+pretty_print = true
+include_dev_dependencies = false
+include_transitive_dependencies = true
+
+[cyclonedx]
+spec_version = "1.5"
+metadata_timestamp = true
+component_type = "application"
+
+# Include vulnerability data if available
+include_vulnerabilities = true
+vulnerability_source = "osv"
+
+# Include license information
+include_licenses = true
+license_choice = "id"  # Use SPDX license identifiers
+
+# Include build metadata
+[build_metadata]
+build_system = "cargo"
+build_date = true
+git_commit = true
+git_branch = true
+build_user = true
+build_host = true
+
+# Component metadata to include
+[component_metadata]
+include_authors = true
+include_description = true
+include_homepage = true
+include_repository = true
+include_documentation = true
+include_keywords = true
+include_categories = true
+
+# Security considerations
+[security]
+# Include security advisories
+include_advisories = true
+advisory_sources = ["rustsec", "osv"]
+
+# Include cryptographic information
+include_crypto_components = true
+crypto_algorithms = [
+    "SHA-3",
+    "BLAKE3",
+    "BLS12-381",
+    "Groth16"
+]
+
+# Supply chain security
+[supply_chain]
+include_provenance = true
+verify_signatures = true
+include_attestations = true
+
+# Custom properties for ZKP Dataset Ledger
+[custom_properties]
+"zkp:proof_system" = "Groth16"
+"zkp:elliptic_curve" = "BLS12-381"
+"zkp:hash_algorithms" = ["SHA-3", "BLAKE3"]
+"zkp:storage_backends" = ["RocksDB", "PostgreSQL"]
+"zkp:compliance_frameworks" = ["GDPR", "CCPA", "HIPAA"]
+"zkp:security_level" = "128-bit"
+
+# Exclude certain components from SBOM
+[exclusions]
+# Development-only dependencies
+exclude_dev_deps = true
+
+# Test-only components
+exclude_test_files = [
+    "tests/**",
+    "benches/**",
+    "examples/**"
+]
+
+# Temporary or build artifacts
+exclude_build_artifacts = [
+    "target/**",
+    "*.tmp",
+    "*.temp"
+]
+
+# Validation rules
+[validation]
+required_fields = [
+    "name",
+    "version", 
+    "license",
+    "supplier"
+]
+
+# Fail if critical vulnerabilities found
+fail_on_high_severity = true
+max_cvss_score = 7.0
+
+# Format validation
+validate_spdx_ids = true
+validate_urls = true
+
+# NTIA minimum elements compliance
+ntia_compliant = true
