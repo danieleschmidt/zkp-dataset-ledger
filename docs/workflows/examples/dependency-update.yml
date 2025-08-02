@@ -1,0 +1,397 @@
+# Automated Dependency Update Workflow
+# Copy this file to .github/workflows/dependency-update.yml
+
+name: Dependency Updates
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of updates to perform'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - all
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  security-updates:
+    name: Security Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit and cargo-edit
+        run: |
+          cargo install cargo-audit cargo-edit
+
+      - name: Check for security advisories
+        id: audit
+        run: |
+          # Run audit and capture output
+          if ! cargo audit --json > audit_results.json; then
+            echo "security_issues=true" >> $GITHUB_OUTPUT
+            echo "Security advisories found"
+          else
+            echo "security_issues=false" >> $GITHUB_OUTPUT
+            echo "No security advisories found"
+          fi
+
+      - name: Apply security updates
+        if: steps.audit.outputs.security_issues == 'true'
+        run: |
+          # Parse audit results and update vulnerable dependencies
+          cat audit_results.json | jq -r '.vulnerabilities[].advisory.package' | sort -u | while read package; do
+            echo "Updating security advisory for: $package"
+            cargo update -p "$package"
+          done
+
+      - name: Test security updates
+        if: steps.audit.outputs.security_issues == 'true'
+        run: |
+          cargo build --all-features
+          cargo test --lib --all-features
+
+      - name: Create security update PR
+        if: steps.audit.outputs.security_issues == 'true'
+        uses: peter-evans/create-pull-request@70a41aba780001da0a30141984ae2a0c95d8704e # v6.0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "security: update dependencies with security advisories"
+          title: "🔒 Security: Update dependencies with security advisories"
+          body: |
+            ## Security Dependency Updates
+            
+            This PR updates dependencies that have security advisories.
+            
+            ### Updated Packages
+            
+            ```
+            $(cargo audit --json | jq -r '.vulnerabilities[].advisory.package' | sort -u | sed 's/^/- /')
+            ```
+            
+            ### Security Advisories
+            
+            ```
+            $(cargo audit --json | jq -r '.vulnerabilities[] | "- \(.advisory.package): \(.advisory.title) (RUSTSEC-\(.advisory.id))"')
+            ```
+            
+            ### Testing
+            
+            - [x] Build passes with updated dependencies
+            - [x] Unit tests pass
+            - [ ] Integration tests pass (will run in CI)
+            - [ ] Security audit passes
+            
+            **Priority**: High - Contains security fixes
+            **Auto-merge**: Disabled - Requires manual review for security changes
+          branch: security/dependency-updates
+          delete-branch: true
+          labels: |
+            security
+            dependencies
+            automated-pr
+
+  dependency-updates:
+    name: Regular Dependency Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.update_type != ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install dependency management tools
+        run: |
+          cargo install cargo-edit cargo-outdated cargo-audit
+
+      - name: Determine update strategy
+        id: strategy
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            UPDATE_TYPE="${{ github.event.inputs.update_type }}"
+          else
+            UPDATE_TYPE="patch"
+          fi
+          echo "update_type=${UPDATE_TYPE}" >> $GITHUB_OUTPUT
+
+      - name: Check for outdated dependencies
+        id: outdated
+        run: |
+          # Generate outdated dependencies report
+          cargo outdated --format json > outdated.json
+          
+          # Check if there are any outdated dependencies
+          if [[ $(jq '.dependencies | length' outdated.json) -gt 0 ]]; then
+            echo "outdated_deps=true" >> $GITHUB_OUTPUT
+          else
+            echo "outdated_deps=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update patch versions
+        if: steps.outdated.outputs.outdated_deps == 'true' && (steps.strategy.outputs.update_type == 'patch' || steps.strategy.outputs.update_type == 'all')
+        run: |
+          # Update patch versions only
+          jq -r '.dependencies[] | select(.available != null and (.available | split(".") | .[0:2]) == (.project | split(".") | .[0:2])) | .name' outdated.json | while read dep; do
+            echo "Updating patch version for: $dep"
+            cargo update -p "$dep"
+          done
+
+      - name: Update minor versions
+        if: steps.outdated.outputs.outdated_deps == 'true' && (steps.strategy.outputs.update_type == 'minor' || steps.strategy.outputs.update_type == 'all')
+        run: |
+          # Update minor versions (same major)
+          jq -r '.dependencies[] | select(.available != null and (.available | split(".") | .[0]) == (.project | split(".") | .[0])) | .name' outdated.json | while read dep; do
+            echo "Updating minor version for: $dep"
+            cargo update -p "$dep"
+          done
+
+      - name: Update major versions
+        if: steps.outdated.outputs.outdated_deps == 'true' && (steps.strategy.outputs.update_type == 'major' || steps.strategy.outputs.update_type == 'all')
+        run: |
+          # Update all versions (including major)
+          jq -r '.dependencies[] | select(.available != null) | .name' outdated.json | while read dep; do
+            echo "Updating to latest version for: $dep"
+            cargo update -p "$dep"
+          done
+
+      - name: Check for breaking changes
+        if: steps.outdated.outputs.outdated_deps == 'true'
+        id: breaking_changes
+        run: |
+          # Try to build and test
+          if cargo build --all-features; then
+            echo "build_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_success=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if cargo test --lib --all-features --no-run; then
+            echo "test_compile_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "test_compile_success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run quick tests
+        if: steps.breaking_changes.outputs.build_success == 'true' && steps.breaking_changes.outputs.test_compile_success == 'true'
+        id: tests
+        run: |
+          if cargo test --lib --all-features; then
+            echo "tests_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_pass=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run security audit
+        if: steps.outdated.outputs.outdated_deps == 'true'
+        id: audit
+        run: |
+          if cargo audit; then
+            echo "audit_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "audit_pass=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate update summary
+        if: steps.outdated.outputs.outdated_deps == 'true'
+        run: |
+          echo "## Dependency Update Summary" > update_summary.md
+          echo "" >> update_summary.md
+          
+          echo "### Update Type: ${{ steps.strategy.outputs.update_type }}" >> update_summary.md
+          echo "" >> update_summary.md
+          
+          echo "### Updated Dependencies" >> update_summary.md
+          cargo tree --duplicates >> update_summary.md || echo "No duplicate dependencies found" >> update_summary.md
+          echo "" >> update_summary.md
+          
+          echo "### Test Results" >> update_summary.md
+          echo "- Build: ${{ steps.breaking_changes.outputs.build_success == 'true' && '✅ Pass' || '❌ Fail' }}" >> update_summary.md
+          echo "- Tests: ${{ steps.tests.outputs.tests_pass == 'true' && '✅ Pass' || '❌ Fail' }}" >> update_summary.md
+          echo "- Security Audit: ${{ steps.audit.outputs.audit_pass == 'true' && '✅ Pass' || '❌ Fail' }}" >> update_summary.md
+
+      - name: Create dependency update PR
+        if: steps.outdated.outputs.outdated_deps == 'true'
+        uses: peter-evans/create-pull-request@70a41aba780001da0a30141984ae2a0c95d8704e # v6.0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "deps: update ${{ steps.strategy.outputs.update_type }} version dependencies"
+          title: "🔄 Dependencies: Update ${{ steps.strategy.outputs.update_type }} versions"
+          body-path: update_summary.md
+          branch: deps/update-${{ steps.strategy.outputs.update_type }}-${{ github.run_number }}
+          delete-branch: true
+          labels: |
+            dependencies
+            automated-pr
+            ${{ steps.strategy.outputs.update_type }}-update
+
+  rust-version-update:
+    name: Rust Version Update
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check latest Rust version
+        id: rust_version
+        run: |
+          # Get current stable Rust version
+          CURRENT_VERSION=$(grep 'rust-version = ' Cargo.toml | sed 's/.*rust-version = "\(.*\)".*/\1/' || echo "")
+          LATEST_VERSION=$(curl -s https://forge.rust-lang.org/infra/channel-based-releases.html | grep -o 'stable-[0-9-]*' | head -1 | sed 's/stable-//')
+          
+          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+          echo "latest_version=${LATEST_VERSION}" >> $GITHUB_OUTPUT
+          
+          if [[ "${CURRENT_VERSION}" != "${LATEST_VERSION}" && -n "${LATEST_VERSION}" ]]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Rust version
+        if: steps.rust_version.outputs.update_needed == 'true'
+        run: |
+          # Update rust-version in Cargo.toml
+          sed -i 's/rust-version = .*/rust-version = "${{ steps.rust_version.outputs.latest_version }}"/' Cargo.toml
+          
+          # Update CI workflows if they specify Rust version
+          find .github/workflows -name "*.yml" -exec sed -i 's/toolchain: stable/toolchain: ${{ steps.rust_version.outputs.latest_version }}/' {} \;
+
+      - name: Test with new Rust version
+        if: steps.rust_version.outputs.update_needed == 'true'
+        run: |
+          # Install the new Rust version
+          rustup install ${{ steps.rust_version.outputs.latest_version }}
+          rustup default ${{ steps.rust_version.outputs.latest_version }}
+          
+          # Install system dependencies
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+          
+          # Test build
+          cargo build --all-features
+          cargo test --lib --all-features --no-run
+
+      - name: Create Rust version update PR
+        if: steps.rust_version.outputs.update_needed == 'true'
+        uses: peter-evans/create-pull-request@70a41aba780001da0a30141984ae2a0c95d8704e # v6.0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "build: update minimum Rust version to ${{ steps.rust_version.outputs.latest_version }}"
+          title: "🦀 Rust: Update minimum version to ${{ steps.rust_version.outputs.latest_version }}"
+          body: |
+            ## Rust Version Update
+            
+            Updates the minimum supported Rust version (MSRV) from `${{ steps.rust_version.outputs.current_version }}` to `${{ steps.rust_version.outputs.latest_version }}`.
+            
+            ### Changes
+            - Updated `rust-version` in `Cargo.toml`
+            - Updated CI workflows to use new Rust version
+            
+            ### Testing
+            - [x] Project builds with new Rust version
+            - [x] Unit tests compile successfully
+            - [ ] Full test suite passes (will run in CI)
+            
+            ### Notes
+            This is an automated update to keep the project current with the latest stable Rust release.
+            Please review for any compatibility issues or required code changes.
+          branch: rust/update-version-${{ steps.rust_version.outputs.latest_version }}
+          delete-branch: true
+          labels: |
+            build
+            rust-version
+            automated-pr
+
+  github-actions-updates:
+    name: GitHub Actions Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitHub Actions
+        uses: renovatebot/github-action@063e4cc3e40cc24738c3f39d97b3ebc04ecae70c # v40.1.7
+        with:
+          configurationFile: .github/renovate.json
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup-old-prs:
+    name: Cleanup Old PRs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Close stale dependency PRs
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: 'deps/',
+              sort: 'created',
+              direction: 'asc'
+            });
+            
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 days ago
+            
+            for (const pr of prs) {
+              const createdDate = new Date(pr.created_at);
+              if (createdDate < cutoffDate && pr.head.ref.startsWith('deps/')) {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  state: 'closed'
+                });
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: 'Automatically closed due to age. A new dependency update PR will be created if needed.'
+                });
+              }
+            }
