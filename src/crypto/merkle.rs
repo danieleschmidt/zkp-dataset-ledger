@@ -13,12 +13,12 @@ impl MerkleTree {
                 nodes: vec![],
             };
         }
-        
+
         let mut nodes = leaves;
-        
+
         while nodes.len() > 1 {
             let mut next_level = Vec::new();
-            
+
             for chunk in nodes.chunks(2) {
                 let combined = if chunk.len() == 2 {
                     [&chunk[0][..], &chunk[1][..]].concat()
@@ -27,10 +27,10 @@ impl MerkleTree {
                 };
                 next_level.push(sha3_hash(&combined));
             }
-            
+
             nodes = next_level;
         }
-        
+
         Self {
             root: nodes[0].clone(),
             nodes,
