@@ -1,0 +1,504 @@
+# GitHub Actions workflow for ML pipeline with ZKP Dataset Ledger integration
+# This demonstrates automated dataset auditing in CI/CD
+
+name: ML Pipeline with ZKP Auditing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'data/**'
+      - 'models/**'
+      - 'pipelines/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'data/**'
+      - 'models/**'
+      - 'pipelines/**'
+  schedule:
+    # Run daily model retraining with audit
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dataset_version:
+        description: 'Dataset version to process'
+        required: false
+        default: 'latest'
+      audit_level:
+        description: 'Audit level (basic, standard, comprehensive)'
+        required: false
+        default: 'standard'
+
+env:
+  PYTHON_VERSION: '3.11'
+  RUST_VERSION: 'stable'
+  ZKP_PROJECT_NAME: 'ci-ml-pipeline'
+
+jobs:
+  setup-zkp-ledger:
+    name: Setup ZKP Ledger
+    runs-on: ubuntu-latest
+    outputs:
+      ledger-ready: ${{ steps.init.outputs.ready }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-zkp-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build ZKP Ledger
+        run: |
+          cargo build --release --bin zkp-ledger
+
+      - name: Initialize ledger for CI
+        id: init
+        run: |
+          ./target/release/zkp-ledger init --project ${{ env.ZKP_PROJECT_NAME }}
+          echo "ready=true" >> $GITHUB_OUTPUT
+
+      - name: Upload ZKP binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkp-ledger-binary
+          path: target/release/zkp-ledger
+
+  validate-data:
+    name: Validate and Audit Dataset
+    runs-on: ubuntu-latest
+    needs: setup-zkp-ledger
+    if: needs.setup-zkp-ledger.outputs.ledger-ready == 'true'
+    outputs:
+      dataset-proof-id: ${{ steps.audit.outputs.proof_id }}
+      dataset-valid: ${{ steps.audit.outputs.valid }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ZKP binary
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-ledger-binary
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/zkp-ledger
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install pandas numpy scikit-learn
+
+      - name: Download/Generate dataset
+        run: |
+          mkdir -p data
+          # In a real scenario, this would download from S3, GCS, etc.
+          python -c "
+          import pandas as pd
+          import numpy as np
+          np.random.seed(42)
+          
+          # Generate sample dataset
+          n_samples = 10000
+          data = {
+              'feature_1': np.random.normal(0, 1, n_samples),
+              'feature_2': np.random.normal(0, 1, n_samples),
+              'feature_3': np.random.exponential(1, n_samples),
+              'target': np.random.choice([0, 1], n_samples, p=[0.7, 0.3])
+          }
+          
+          df = pd.DataFrame(data)
+          df.to_csv('data/training_data.csv', index=False)
+          print(f'Generated dataset with {len(df)} rows and {len(df.columns)} columns')
+          "
+
+      - name: Audit dataset with ZKP proof
+        id: audit
+        run: |
+          # Notarize the dataset with cryptographic proof
+          PROOF_OUTPUT=$(./bin/zkp-ledger notarize data/training_data.csv \
+            --name "training-data-${{ github.run_id }}" \
+            --hash-algorithm sha3-256 \
+            --prove-properties row_count,schema,statistics \
+            --output-format json)
+          
+          echo "Dataset audit output:"
+          echo "$PROOF_OUTPUT"
+          
+          # Extract proof ID (this would be more robust in practice)
+          PROOF_ID=$(echo "$PROOF_OUTPUT" | grep -o '"proof_id":"[^"]*"' | cut -d'"' -f4)
+          echo "proof_id=$PROOF_ID" >> $GITHUB_OUTPUT
+          
+          # Verify the proof
+          if ./bin/zkp-ledger verify "$PROOF_ID"; then
+            echo "valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Dataset proof verified successfully"
+          else
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "❌ Dataset proof verification failed"
+            exit 1
+          fi
+
+      - name: Upload dataset audit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataset-audit-${{ github.run_id }}
+          path: |
+            data/training_data.csv
+            *.json
+
+      - name: Comment on PR with audit results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const proofId = '${{ steps.audit.outputs.proof_id }}';
+            const isValid = '${{ steps.audit.outputs.valid }}' === 'true';
+            
+            const body = `
+            ## 🔐 Dataset Audit Results
+            
+            **Proof ID**: \`${proofId}\`
+            **Status**: ${isValid ? '✅ Verified' : '❌ Failed'}
+            **Dataset**: training_data.csv
+            **Run**: ${{ github.run_id }}
+            
+            ${isValid ? 
+              'The dataset has been cryptographically proven and is ready for training.' :
+              'Dataset verification failed. Please check the data integrity.'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  train-model:
+    name: Train Model with Audit Trail
+    runs-on: ubuntu-latest
+    needs: [setup-zkp-ledger, validate-data]
+    if: needs.validate-data.outputs.dataset-valid == 'true'
+    outputs:
+      model-proof-id: ${{ steps.model-audit.outputs.proof_id }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ZKP binary
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-ledger-binary
+          path: ./bin
+
+      - name: Download dataset artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dataset-audit-${{ github.run_id }}
+          path: ./data
+
+      - name: Make binary executable
+        run: chmod +x ./bin/zkp-ledger
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ML dependencies
+        run: |
+          pip install pandas numpy scikit-learn joblib mlflow
+
+      - name: Train model with provenance
+        id: training
+        run: |
+          python -c "
+          import pandas as pd
+          import numpy as np
+          from sklearn.ensemble import RandomForestClassifier
+          from sklearn.model_selection import train_test_split
+          from sklearn.metrics import accuracy_score, classification_report
+          import joblib
+          import json
+          import os
+          
+          # Load the audited dataset
+          df = pd.read_csv('data/training_data.csv')
+          print(f'Loaded dataset: {df.shape}')
+          
+          # Split features and target
+          X = df.drop('target', axis=1)
+          y = df['target']
+          
+          # Train/test split
+          X_train, X_test, y_train, y_test = train_test_split(
+              X, y, test_size=0.2, random_state=42, stratify=y
+          )
+          
+          # Train model
+          model = RandomForestClassifier(n_estimators=100, random_state=42)
+          model.fit(X_train, y_train)
+          
+          # Evaluate
+          y_pred = model.predict(X_test)
+          accuracy = accuracy_score(y_test, y_pred)
+          
+          print(f'Model accuracy: {accuracy:.4f}')
+          
+          # Save model
+          os.makedirs('models', exist_ok=True)
+          joblib.dump(model, 'models/random_forest_model.pkl')
+          
+          # Save metrics
+          metrics = {
+              'accuracy': accuracy,
+              'train_size': len(X_train),
+              'test_size': len(X_test),
+              'features': list(X.columns),
+              'dataset_proof_id': '${{ needs.validate-data.outputs.dataset-proof-id }}'
+          }
+          
+          with open('models/metrics.json', 'w') as f:
+              json.dump(metrics, f, indent=2)
+          
+          print(f'::set-output name=accuracy::{accuracy}')
+          "
+
+      - name: Record model training in ledger
+        id: model-audit
+        run: |
+          # Record the model training transformation
+          TRANSFORM_OUTPUT=$(./bin/zkp-ledger transform \
+            --input "training-data-${{ github.run_id }}" \
+            --output "trained-model-${{ github.run_id }}" \
+            --operation "train_random_forest" \
+            --metadata-file models/metrics.json \
+            --prove)
+          
+          echo "Model training audit output:"
+          echo "$TRANSFORM_OUTPUT"
+          
+          PROOF_ID=$(echo "$TRANSFORM_OUTPUT" | grep -o '"proof_id":"[^"]*"' | cut -d'"' -f4)
+          echo "proof_id=$PROOF_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model-${{ github.run_id }}
+          path: |
+            models/
+            *.json
+
+  generate-audit-report:
+    name: Generate Compliance Report
+    runs-on: ubuntu-latest
+    needs: [setup-zkp-ledger, validate-data, train-model]
+    if: always() && needs.validate-data.outputs.dataset-valid == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ZKP binary
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-ledger-binary
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/zkp-ledger
+
+      - name: Generate comprehensive audit report
+        run: |
+          mkdir -p reports
+          
+          # Generate audit report for the entire pipeline
+          ./bin/zkp-ledger audit \
+            --from genesis \
+            --to latest \
+            --format json-ld \
+            --include-proofs \
+            --include-visualizations \
+            --output reports/pipeline_audit_report.json
+          
+          # Generate human-readable summary
+          ./bin/zkp-ledger audit \
+            --from genesis \
+            --to latest \
+            --format markdown \
+            --output reports/pipeline_summary.md
+
+      - name: Validate audit chain integrity
+        run: |
+          if ./bin/zkp-ledger verify-chain --strict; then
+            echo "✅ Audit chain integrity verified"
+            echo "CHAIN_VALID=true" >> $GITHUB_ENV
+          else
+            echo "❌ Audit chain integrity check failed"
+            echo "CHAIN_VALID=false" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-reports-${{ github.run_id }}
+          path: reports/
+
+      - name: Create GitHub Pages deployment
+        if: github.ref == 'refs/heads/main' && env.CHAIN_VALID == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          destination_dir: audit-reports/${{ github.run_id }}
+
+      - name: Post audit summary to PR
+        if: github.event_name == 'pull_request' && env.CHAIN_VALID == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const summary = fs.readFileSync('reports/pipeline_summary.md', 'utf8');
+              
+              const body = `
+              ## 📊 ML Pipeline Audit Summary
+              
+              **Run ID**: ${{ github.run_id }}
+              **Chain Integrity**: ✅ Verified
+              **Dataset Proof**: ${{ needs.validate-data.outputs.dataset-proof-id }}
+              **Model Proof**: ${{ needs.train-model.outputs.model-proof-id }}
+              
+              ### Audit Details
+              
+              ${summary}
+              
+              **Full Report**: Available in workflow artifacts
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } catch (error) {
+              console.log('Could not read audit summary:', error.message);
+            }
+
+  security-check:
+    name: Security and Compliance Check
+    runs-on: ubuntu-latest
+    needs: [setup-zkp-ledger, validate-data, train-model]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ZKP binary
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-ledger-binary
+          path: ./bin
+
+      - name: Make binary executable
+        run: chmod +x ./bin/zkp-ledger
+
+      - name: Check for data leaks in proofs
+        run: |
+          echo "🔍 Checking for potential data leaks in ZK proofs..."
+          
+          # This would run more sophisticated checks in practice
+          if ./bin/zkp-ledger security-check --check-privacy --check-proofs; then
+            echo "✅ No security issues detected"
+          else
+            echo "❌ Security issues found"
+            exit 1
+          fi
+
+      - name: Generate compliance matrix
+        run: |
+          ./bin/zkp-ledger compliance \
+            --standards gdpr,ai-act,sox \
+            --output compliance_matrix.json
+          
+          echo "📋 Compliance status:"
+          cat compliance_matrix.json
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.run_id }}
+          path: |
+            compliance_matrix.json
+            security_*.log
+
+  deploy-model:
+    name: Deploy Model (Production)
+    runs-on: ubuntu-latest
+    needs: [validate-data, train-model, generate-audit-report, security-check]
+    if: github.ref == 'refs/heads/main' && needs.validate-data.outputs.dataset-valid == 'true'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download model artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model-${{ github.run_id }}
+          path: ./models
+
+      - name: Download audit reports
+        uses: actions/download-artifact@v4
+        with:
+          name: audit-reports-${{ github.run_id }}
+          path: ./reports
+
+      - name: Deploy to production with audit trail
+        run: |
+          echo "🚀 Deploying model to production..."
+          echo "Model proof ID: ${{ needs.train-model.outputs.model-proof-id }}"
+          echo "Dataset proof ID: ${{ needs.validate-data.outputs.dataset-proof-id }}"
+          
+          # In practice, this would deploy to your ML serving infrastructure
+          # with the audit trail metadata attached
+          
+          echo "✅ Model deployed with complete audit trail"
+
+  cleanup:
+    name: Cleanup Temporary Resources
+    runs-on: ubuntu-latest
+    needs: [deploy-model]
+    if: always()
+    steps:
+      - name: Clean up temporary files
+        run: |
+          echo "🧹 Cleaning up temporary resources..."
+          # Clean up any temporary storage, caches, etc.
+          echo "✅ Cleanup completed"
