@@ -3,8 +3,9 @@
 use crate::error::LedgerError;
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof, ProvingKey};
 use ark_r1cs_std::prelude::*;
+use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
-use ark_std::rand::Rng;
+use ark_snark::SNARK;
 
 pub type Curve = ark_bls12_381::Bls12_381;
 pub type Fr = ark_bls12_381::Fr;
