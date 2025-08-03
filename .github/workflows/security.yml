@@ -1,0 +1,379 @@
+# Security Scanning Workflow for ZKP Dataset Ledger
+# Copy this file to .github/workflows/security.yml
+
+name: Security
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@56ab7930c591507f833cbaed864d201386ced493 # v2.29.7
+        with:
+          tool: cargo-audit
+
+      - name: Run cargo audit
+        run: |
+          cargo audit --json > audit-results.json || true
+          cargo audit
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        if: always()
+        with:
+          name: audit-results
+          path: audit-results.json
+
+  supply-chain-security:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@56ab7930c591507f833cbaed864d201386ced493 # v2.29.7
+        with:
+          tool: cargo-deny
+
+      - name: Run cargo-deny
+        run: |
+          cargo deny check advisories
+          cargo deny check licenses
+          cargo deny check bans
+          cargo deny check sources
+
+      - name: Install cargo-cyclonedx
+        uses: taiki-e/install-action@56ab7930c591507f833cbaed864d201386ced493 # v2.29.7
+        with:
+          tool: cargo-cyclonedx
+
+      - name: Generate SBOM
+        run: |
+          cargo cyclonedx --format json --output-file sbom.json
+          cargo cyclonedx --format xml --output-file sbom.xml
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@7ce3057c387ed0d57b81c9b985c48474cfe4f11e # v3.67.5
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Build Docker image
+        run: |
+          docker build -t zkp-dataset-ledger:security-scan .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # v0.19.0
+        with:
+          image-ref: 'zkp-dataset-ledger:security-scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@1b1aada464948af03b950897e5eb522f92603cc2 # v3.24.9
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy in table format
+        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # v0.19.0
+        with:
+          image-ref: 'zkp-dataset-ledger:security-scan'
+          format: 'table'
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'rust' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@1b1aada464948af03b950897e5eb522f92603cc2 # v3.24.9
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-codeql-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build for CodeQL analysis
+        run: |
+          cargo build --all-features
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@1b1aada464948af03b950897e5eb522f92603cc2 # v3.24.9
+        with:
+          category: "/language:${{matrix.language}}"
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@9129d7d40b8c12c1ed0f60400d00c92d437adcce # v4.1.3
+        with:
+          fail-on-severity: high
+
+  security-scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@0864cf19026789058feabb7e87baa5f140aac736 # v2.3.1
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload SARIF results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@1b1aada464948af03b950897e5eb522f92603cc2 # v3.24.9
+        with:
+          sarif_file: scorecard-results.sarif
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-license
+        uses: taiki-e/install-action@56ab7930c591507f833cbaed864d201386ced493 # v2.29.7
+        with:
+          tool: cargo-license
+
+      - name: Check licenses
+        run: |
+          cargo license --json > licenses.json
+          cargo license --tsv > licenses.tsv
+
+      - name: Validate license compatibility
+        run: |
+          # Check for GPL licenses that might conflict
+          if cargo license --tsv | grep -E "(GPL-[23]\.0|AGPL)"; then
+            echo "❌ GPL/AGPL licenses found - check compatibility"
+            exit 1
+          else
+            echo "✅ No problematic licenses detected"
+          fi
+
+      - name: Upload license report
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: license-report
+          path: |
+            licenses.json
+            licenses.tsv
+
+  crypto-validation:
+    name: Cryptographic Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-crypto-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check for weak cryptographic practices
+        run: |
+          # Look for potentially weak crypto patterns
+          echo "🔍 Checking for weak cryptographic patterns..."
+          
+          # Check for hardcoded seeds or keys
+          if grep -r "seed.*=.*[0-9]" src/ || grep -r "key.*=.*[\"']" src/; then
+            echo "⚠️  Potential hardcoded cryptographic values found"
+            exit 1
+          fi
+          
+          # Check for deprecated hash functions
+          if grep -r "md5\|sha1\|rc4" src/; then
+            echo "❌ Deprecated cryptographic algorithms found"
+            exit 1
+          fi
+          
+          # Check for proper random number generation
+          if grep -r "rand::" src/ && ! grep -r "OsRng\|ThreadRng" src/; then
+            echo "⚠️  Check random number generation - ensure cryptographically secure"
+          fi
+          
+          echo "✅ Basic cryptographic validation passed"
+
+      - name: Run property-based crypto tests
+        run: |
+          cargo test --features property-testing crypto
+        env:
+          PROPTEST_CASES: 1000
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [vulnerability-scan, supply-chain-security, secret-scan, container-security, codeql-analysis, license-check, crypto-validation]
+    if: always()
+    steps:
+      - name: Security Summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Vulnerability Scan | ${{ needs.vulnerability-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supply Chain Security | ${{ needs.supply-chain-security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Detection | ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Security | ${{ needs.container-security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Crypto Validation | ${{ needs.crypto-validation.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          
+          # Fail if any critical security checks failed
+          if [[ "${{ needs.vulnerability-scan.result }}" != "success" ]] || \
+             [[ "${{ needs.secret-scan.result }}" != "success" ]] || \
+             [[ "${{ needs.crypto-validation.result }}" != "success" ]]; then
+            echo "❌ Critical security checks failed"
+            exit 1
+          fi

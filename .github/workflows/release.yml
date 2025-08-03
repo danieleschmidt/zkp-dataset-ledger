@@ -1,0 +1,468 @@
+# Release Workflow for ZKP Dataset Ledger
+# Copy this file to .github/workflows/release.yml
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          
+          # Check if this is a prerelease
+          if [[ "${VERSION}" =~ -[a-zA-Z] ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?$ ]]; then
+            echo "Invalid version format: ${VERSION}"
+            echo "Expected format: vX.Y.Z or vX.Y.Z-prerelease"
+            exit 1
+          fi
+
+      - name: Check if version exists in Cargo.toml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CARGO_VERSION="v$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')"
+          if [[ "${VERSION}" != "${CARGO_VERSION}" ]]; then
+            echo "Version mismatch: tag=${VERSION}, Cargo.toml=${CARGO_VERSION}"
+            exit 1
+          fi
+
+      - name: Validate changelog entry
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if ! grep -q "## \[${VERSION#v}\]" CHANGELOG.md; then
+            echo "No changelog entry found for version ${VERSION}"
+            exit 1
+          fi
+
+  test-suite:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Start PostgreSQL
+        uses: harmon758/postgresql-action@v1.0.0
+        with:
+          postgresql version: '15'
+          postgresql db: 'zkp_test'
+          postgresql user: 'postgres'
+          postgresql password: 'postgres'
+
+      - name: Run full test suite
+        run: |
+          cargo test --all-features --workspace
+          cargo test --test integration_tests --all-features
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost/zkp_test
+          RUST_LOG: info
+
+      - name: Run security audit
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Run cargo deny
+        run: |
+          cargo install cargo-deny
+          cargo deny check
+
+  build-release-artifacts:
+    name: Build Release Artifacts
+    runs-on: ${{ matrix.config.os }}
+    needs: [validate-release, test-suite]
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            artifact_name: zkp-ledger
+            asset_name: zkp-ledger-linux-x86_64
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            artifact_name: zkp-ledger
+            asset_name: zkp-ledger-linux-x86_64-musl
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            artifact_name: zkp-ledger
+            asset_name: zkp-ledger-linux-aarch64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: zkp-ledger
+            asset_name: zkp-ledger-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: zkp-ledger
+            asset_name: zkp-ledger-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: zkp-ledger.exe
+            asset_name: zkp-ledger-windows-x86_64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.config.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+          
+          # Install cross-compilation tools for musl and aarch64
+          if [[ "${{ matrix.config.target }}" == "x86_64-unknown-linux-musl" ]]; then
+            sudo apt-get install -y musl-tools
+          elif [[ "${{ matrix.config.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+
+      - name: Install system dependencies (macOS)
+        if: matrix.config.os == 'macos-latest'
+        run: |
+          brew install cmake llvm pkg-config openssl
+
+      - name: Install system dependencies (Windows)
+        if: matrix.config.os == 'windows-latest'
+        run: |
+          choco install cmake llvm
+          echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+          target: ${{ matrix.config.target }}
+
+      - name: Cache dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ matrix.config.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Configure cross-compilation environment
+        run: |
+          if [[ "${{ matrix.config.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          fi
+
+      - name: Build release binary
+        run: |
+          cargo build --release --target ${{ matrix.config.target }}
+
+      - name: Strip binary (Unix)
+        if: matrix.config.os != 'windows-latest'
+        run: |
+          if [[ "${{ matrix.config.target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            aarch64-linux-gnu-strip target/${{ matrix.config.target }}/release/${{ matrix.config.artifact_name }}
+          else
+            strip target/${{ matrix.config.target }}/release/${{ matrix.config.artifact_name }}
+          fi
+
+      - name: Create archive
+        shell: bash
+        run: |
+          cd target/${{ matrix.config.target }}/release
+          
+          if [[ "${{ matrix.config.os }}" == "windows-latest" ]]; then
+            7z a ../../../${{ matrix.config.asset_name }}.zip ${{ matrix.config.artifact_name }}
+          else
+            tar czvf ../../../${{ matrix.config.asset_name }}.tar.gz ${{ matrix.config.artifact_name }}
+          fi
+          
+          cd -
+
+      - name: Calculate checksums
+        shell: bash
+        run: |
+          if [[ "${{ matrix.config.os }}" == "windows-latest" ]]; then
+            ARCHIVE="${{ matrix.config.asset_name }}.zip"
+          else
+            ARCHIVE="${{ matrix.config.asset_name }}.tar.gz"
+          fi
+          
+          sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: ${{ matrix.config.asset_name }}
+          path: |
+            ${{ matrix.config.asset_name }}.*
+
+  build-docker-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [validate-release, test-suite]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.0.0
+        with:
+          images: |
+            zkp-dataset-ledger/zkp-dataset-ledger
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push standard image
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.0.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push security-hardened image
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.0.0
+        with:
+          context: .
+          file: ./Dockerfile.security
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            zkp-dataset-ledger/zkp-dataset-ledger:${{ needs.validate-release.outputs.version }}-secure
+            ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-secure
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+
+      - name: Generate SBOM
+        run: |
+          cargo cyclonedx --format json --output-path zkp-dataset-ledger-sbom.json
+          cargo cyclonedx --format xml --output-path zkp-dataset-ledger-sbom.xml
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: sbom
+          path: |
+            zkp-dataset-ledger-sbom.json
+            zkp-dataset-ledger-sbom.xml
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release-artifacts, build-docker-images, generate-sbom]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Extract changelog for this version
+          awk "/## \[${VERSION#v}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          
+          # Add Docker image information
+          echo "" >> release_notes.md
+          echo "## Docker Images" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "- \`zkp-dataset-ledger/zkp-dataset-ledger:${VERSION}\`" >> release_notes.md
+          echo "- \`zkp-dataset-ledger/zkp-dataset-ledger:${VERSION}-secure\` (security-hardened)" >> release_notes.md
+          echo "- \`ghcr.io/${{ github.repository }}:${VERSION}\`" >> release_notes.md
+          echo "- \`ghcr.io/${{ github.repository }}:${VERSION}-secure\`" >> release_notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@d4e8205d7e959a9cbaa9a1f3d3e9b024224e6357 # v1.0.1
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          name: ZKP Dataset Ledger ${{ needs.validate-release.outputs.version }}
+          body_path: release_notes.md
+          prerelease: ${{ needs.validate-release.outputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: |
+            zkp-ledger-*/*
+            sbom/*
+
+  publish-crate:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: [validate-release, test-suite]
+    if: needs.validate-release.outputs.prerelease == 'false'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang pkg-config libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1482605bfc5719782e1267fd0c0cc350aa87f0bb # stable
+        with:
+          toolchain: stable
+
+      - name: Publish to crates.io
+        run: |
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  post-release:
+    name: Post-release Tasks
+    runs-on: ubuntu-latest
+    needs: [create-release, publish-crate]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+
+      - name: Create post-release issue
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const version = '${{ needs.validate-release.outputs.version }}';
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Post-release tasks for ${version}`,
+              body: `
+            ## Post-release checklist for ${version}
+            
+            - [ ] Update documentation website
+            - [ ] Update Homebrew formula (if applicable)
+            - [ ] Update package managers (AUR, etc.)
+            - [ ] Announce release on social media
+            - [ ] Update roadmap and milestones
+            - [ ] Create next version milestone
+            - [ ] Update security advisories (if any)
+            - [ ] Performance regression analysis
+            
+            **Docker Images:**
+            - \`zkp-dataset-ledger/zkp-dataset-ledger:${version}\`
+            - \`ghcr.io/${{ github.repository }}:${version}\`
+            
+            **Release URL:** ${{ github.server_url }}/${{ github.repository }}/releases/tag/${version}
+              `,
+              labels: ['release', 'post-release-tasks']
+            });
+
+      - name: Notify team
+        if: needs.create-release.result == 'success'
+        run: |
+          echo "✅ Release ${{ needs.validate-release.outputs.version }} created successfully!"
+          echo "📦 Artifacts uploaded and Docker images published"
+          echo "🔗 Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }}"
