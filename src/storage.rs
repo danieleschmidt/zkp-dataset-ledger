@@ -93,114 +93,9 @@ impl Storage for MemoryStorage {
     }
 }
 
-/// RocksDB storage backend.
-#[cfg(feature = "rocksdb")]
-pub mod rocksdb_backend {
-    use super::*;
-    use rocksdb::{Error as RocksError, Options, DB};
-    use std::path::Path;
-
-    pub struct RocksDbStorage {
-        db: DB,
-    }
-
-    impl RocksDbStorage {
-        pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, LedgerError> {
-            let mut opts = Options::default();
-            opts.create_if_missing(true);
-            opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-
-            let db = DB::open(&opts, path)
-                .map_err(|e| LedgerError::StorageError(format!("RocksDB open failed: {}", e)))?;
-
-            Ok(Self { db })
-        }
-
-        pub fn new_with_options<P: AsRef<Path>>(
-            path: P,
-            opts: Options,
-        ) -> Result<Self, LedgerError> {
-            let db = DB::open(&opts, path)
-                .map_err(|e| LedgerError::StorageError(format!("RocksDB open failed: {}", e)))?;
-
-            Ok(Self { db })
-        }
-    }
-
-    impl Storage for RocksDbStorage {
-        fn put(&mut self, key: &str, value: &[u8]) -> Result<(), LedgerError> {
-            self.db
-                .put(key.as_bytes(), value)
-                .map_err(|e| LedgerError::StorageError(format!("RocksDB put failed: {}", e)))
-        }
-
-        fn get(&self, key: &str) -> Result<Option<Vec<u8>>, LedgerError> {
-            self.db
-                .get(key.as_bytes())
-                .map_err(|e| LedgerError::StorageError(format!("RocksDB get failed: {}", e)))
-        }
-
-        fn delete(&mut self, key: &str) -> Result<(), LedgerError> {
-            self.db
-                .delete(key.as_bytes())
-                .map_err(|e| LedgerError::StorageError(format!("RocksDB delete failed: {}", e)))
-        }
-
-        fn list_keys(&self, prefix: &str) -> Result<Vec<String>, LedgerError> {
-            let mut keys = Vec::new();
-            let iter = self.db.prefix_iterator(prefix.as_bytes());
-
-            for item in iter {
-                let (key_bytes, _) = item.map_err(|e| {
-                    LedgerError::StorageError(format!("RocksDB iteration failed: {}", e))
-                })?;
-
-                let key_str = String::from_utf8(key_bytes.to_vec())
-                    .map_err(|e| LedgerError::StorageError(format!("Invalid UTF-8 key: {}", e)))?;
-
-                if !key_str.starts_with(prefix) {
-                    break;
-                }
-
-                keys.push(key_str);
-            }
-
-            Ok(keys)
-        }
-
-        fn exists(&self, key: &str) -> Result<bool, LedgerError> {
-            match self.db.get(key.as_bytes()) {
-                Ok(Some(_)) => Ok(true),
-                Ok(None) => Ok(false),
-                Err(e) => Err(LedgerError::StorageError(format!(
-                    "RocksDB exists check failed: {}",
-                    e
-                ))),
-            }
-        }
-
-        fn stats(&self) -> Result<StorageStats, LedgerError> {
-            let mut total_keys = 0;
-            let mut total_size_bytes = 0u64;
-
-            let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-            for item in iter {
-                let (key, value) = item.map_err(|e| {
-                    LedgerError::StorageError(format!("RocksDB stats iteration failed: {}", e))
-                })?;
-
-                total_keys += 1;
-                total_size_bytes += key.len() as u64 + value.len() as u64;
-            }
-
-            Ok(StorageStats {
-                total_keys,
-                total_size_bytes,
-                backend_type: "rocksdb".to_string(),
-            })
-        }
-    }
-}
+// RocksDB storage backend temporarily disabled due to build dependencies
+// #[cfg(feature = "rocksdb")]
+// pub mod rocksdb_backend { ... }
 
 /// PostgreSQL storage backend.
 #[cfg(feature = "postgres")]
@@ -354,12 +249,6 @@ pub mod postgres_backend {
 pub fn create_storage(backend_type: &str, config: &str) -> Result<Box<dyn Storage>, LedgerError> {
     match backend_type {
         "memory" => Ok(Box::new(MemoryStorage::new())),
-
-        #[cfg(feature = "rocksdb")]
-        "rocksdb" => {
-            use rocksdb_backend::RocksDbStorage;
-            Ok(Box::new(RocksDbStorage::new(config)?))
-        }
 
         #[cfg(feature = "postgres")]
         "postgres" => {
