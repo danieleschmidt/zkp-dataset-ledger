@@ -327,9 +327,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ```bibtex
 @software{zkp_dataset_ledger,
   title={ZKP Dataset Ledger: Cryptographic Provenance for ML Pipelines},
-  author={Your Name},
+  author={Daniel Schmidt},
   year={2025},
-  url={https://github.com/yourusername/zkp-dataset-ledger}
+  url={https://github.com/danieleschmidt/zkp-dataset-ledger}
 }
 ```
 
