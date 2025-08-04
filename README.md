@@ -402,7 +402,7 @@ cargo install zkp-dataset-ledger
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/zkp-dataset-ledger.git
+git clone https://github.com/danieleschmidt/zkp-dataset-ledger.git
 cd zkp-dataset-ledger
 
 # Build release version
