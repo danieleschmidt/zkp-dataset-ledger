@@ -96,6 +96,10 @@ dev: ## Development workflow: format, check, test
 	$(MAKE) clippy
 	$(MAKE) test
 
+dev-fast: ## Fast development workflow: minimal features build and test
+	cargo check --lib --no-default-features --features csv
+	cargo test --lib --no-default-features --features csv
+
 ci: ## CI workflow: all checks
 	$(MAKE) fmt
 	$(MAKE) clippy  
