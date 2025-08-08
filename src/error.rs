@@ -26,6 +26,9 @@ pub enum LedgerError {
     #[error("Storage error: {0}")]
     Storage(String),
 
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 

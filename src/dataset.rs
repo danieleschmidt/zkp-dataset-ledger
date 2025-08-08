@@ -108,7 +108,7 @@ impl Dataset {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let format = DatasetFormat::from_path(path)?;
-        
+
         // Get file metadata
         let metadata = std::fs::metadata(path)
             .map_err(|e| LedgerError::IoError(format!("Failed to read file metadata: {}", e)))?;
@@ -135,7 +135,7 @@ impl Dataset {
             size,
             row_count: Some(row_count),
             column_count: Some(column_count),
-            schema: None, // Would be populated with detailed analysis
+            schema: None,     // Would be populated with detailed analysis
             statistics: None, // Would be populated with detailed analysis
             format,
             path: Some(path.to_string_lossy().to_string()),
@@ -145,14 +145,14 @@ impl Dataset {
     /// Basic CSV analysis to get row and column counts.
     fn analyze_csv_basic<P: AsRef<Path>>(path: P) -> Result<(u64, u64)> {
         let mut reader = csv::Reader::from_path(path)?;
-        
+
         // Get column count from headers
         let headers = reader.headers()?;
         let column_count = headers.len() as u64;
-        
+
         // Count rows
         let row_count = reader.records().count() as u64;
-        
+
         Ok((row_count, column_count))
     }
 
@@ -180,10 +180,14 @@ impl Dataset {
             columns: self.column_count.unwrap_or(0),
             size_bytes: self.size,
             format: self.format.clone(),
-            has_nulls: self.statistics.as_ref()
+            has_nulls: self
+                .statistics
+                .as_ref()
                 .map(|s| s.null_percentage > 0.0)
                 .unwrap_or(false),
-            schema_types: self.schema.as_ref()
+            schema_types: self
+                .schema
+                .as_ref()
                 .map(|s| s.iter().map(|col| col.data_type.clone()).collect())
                 .unwrap_or_default(),
         }
@@ -240,10 +244,22 @@ mod tests {
 
     #[test]
     fn test_dataset_format_detection() {
-        assert_eq!(DatasetFormat::from_path("test.csv").unwrap(), DatasetFormat::Csv);
-        assert_eq!(DatasetFormat::from_path("test.parquet").unwrap(), DatasetFormat::Parquet);
-        assert_eq!(DatasetFormat::from_path("test.json").unwrap(), DatasetFormat::Json);
-        assert_eq!(DatasetFormat::from_path("test.jsonl").unwrap(), DatasetFormat::JsonLines);
+        assert_eq!(
+            DatasetFormat::from_path("test.csv").unwrap(),
+            DatasetFormat::Csv
+        );
+        assert_eq!(
+            DatasetFormat::from_path("test.parquet").unwrap(),
+            DatasetFormat::Parquet
+        );
+        assert_eq!(
+            DatasetFormat::from_path("test.json").unwrap(),
+            DatasetFormat::Json
+        );
+        assert_eq!(
+            DatasetFormat::from_path("test.jsonl").unwrap(),
+            DatasetFormat::JsonLines
+        );
     }
 
     #[test]
@@ -258,7 +274,7 @@ mod tests {
         std::fs::copy(temp_file.path(), &temp_path).unwrap();
 
         let dataset = Dataset::from_path(&temp_path).unwrap();
-        
+
         assert_eq!(dataset.format, DatasetFormat::Csv);
         assert_eq!(dataset.row_count, Some(2)); // Two data rows
         assert_eq!(dataset.column_count, Some(3)); // Three columns
@@ -278,7 +294,7 @@ mod tests {
         std::fs::copy(temp_file.path(), &temp_path).unwrap();
 
         let dataset = Dataset::from_path(&temp_path).unwrap();
-        
+
         // Should validate successfully
         assert!(dataset.validate_integrity().unwrap());
 

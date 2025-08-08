@@ -45,7 +45,7 @@ impl Default for SecurityConfig {
 }
 
 /// User permissions and roles
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Permission {
     /// Read ledger entries and proofs
     Read,
@@ -79,7 +79,7 @@ impl Role {
         let mut permissions = HashSet::new();
         permissions.insert(Permission::Read);
         permissions.insert(Permission::Verify);
-        
+
         Self {
             name: "ReadOnly".to_string(),
             permissions,
@@ -94,7 +94,7 @@ impl Role {
         permissions.insert(Permission::Write);
         permissions.insert(Permission::Verify);
         permissions.insert(Permission::Export);
-        
+
         Self {
             name: "DataScientist".to_string(),
             permissions,
@@ -113,7 +113,7 @@ impl Role {
         permissions.insert(Permission::Export);
         permissions.insert(Permission::Import);
         permissions.insert(Permission::Verify);
-        
+
         Self {
             name: "Admin".to_string(),
             permissions,
@@ -211,7 +211,7 @@ impl SecurityValidator {
         // Check for path traversal attacks
         if path.contains("..") || path.contains("~") {
             return Err(LedgerError::InvalidInput(
-                "Path traversal detected in file path".to_string()
+                "Path traversal detected in file path".to_string(),
             ));
         }
 
@@ -222,37 +222,38 @@ impl SecurityValidator {
         {
             let ext_lower = extension.to_lowercase();
             if !self.config.allowed_extensions.contains(&ext_lower) {
-                return Err(LedgerError::InvalidInput(
-                    format!("File extension '{}' not allowed", extension)
-                ));
+                return Err(LedgerError::InvalidInput(format!(
+                    "File extension '{}' not allowed",
+                    extension
+                )));
             }
         } else {
             return Err(LedgerError::InvalidInput(
-                "File must have a valid extension".to_string()
+                "File must have a valid extension".to_string(),
             ));
         }
 
         // Check if file exists and is readable
         if !std::path::Path::new(path).exists() {
-            return Err(LedgerError::InvalidInput(
-                "File does not exist".to_string()
-            ));
+            return Err(LedgerError::InvalidInput("File does not exist".to_string()));
         }
 
         // Check file size
         match std::fs::metadata(path) {
             Ok(metadata) => {
                 if metadata.len() > self.config.max_file_size_bytes {
-                    return Err(LedgerError::InvalidInput(
-                        format!("File size {} exceeds maximum allowed size of {} bytes",
-                                metadata.len(), self.config.max_file_size_bytes)
-                    ));
+                    return Err(LedgerError::InvalidInput(format!(
+                        "File size {} exceeds maximum allowed size of {} bytes",
+                        metadata.len(),
+                        self.config.max_file_size_bytes
+                    )));
                 }
             }
             Err(e) => {
-                return Err(LedgerError::IoError(
-                    format!("Failed to read file metadata: {}", e)
-                ));
+                return Err(LedgerError::IoError(format!(
+                    "Failed to read file metadata: {}",
+                    e
+                )));
             }
         }
 
@@ -264,7 +265,7 @@ impl SecurityValidator {
         // Check length
         if name.len() > 255 {
             return Err(LedgerError::InvalidInput(
-                "Dataset name too long (max 255 characters)".to_string()
+                "Dataset name too long (max 255 characters)".to_string(),
             ));
         }
 
@@ -276,7 +277,7 @@ impl SecurityValidator {
 
         if sanitized.is_empty() {
             return Err(LedgerError::InvalidInput(
-                "Dataset name cannot be empty after sanitization".to_string()
+                "Dataset name cannot be empty after sanitization".to_string(),
             ));
         }
 
@@ -289,12 +290,15 @@ impl SecurityValidator {
         let one_minute_ago = now - chrono::Duration::minutes(1);
 
         // Clean old entries and count recent ones
-        let entries = self.rate_limiter.entry(client_id.to_string()).or_insert_with(Vec::new);
+        let entries = self
+            .rate_limiter
+            .entry(client_id.to_string())
+            .or_insert_with(Vec::new);
         entries.retain(|&timestamp| timestamp > one_minute_ago);
 
         if entries.len() >= self.config.rate_limit_per_minute as usize {
             return Err(LedgerError::InvalidInput(
-                "Rate limit exceeded. Too many requests.".to_string()
+                "Rate limit exceeded. Too many requests.".to_string(),
             ));
         }
 
@@ -311,12 +315,18 @@ impl SecurityValidator {
         }
 
         let content_str = String::from_utf8_lossy(content);
-        
+
         // Common patterns for sensitive data
         let patterns = vec![
             (r"\b\d{3}-\d{2}-\d{4}\b", "Potential SSN"),
-            (r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", "Potential Credit Card"),
-            (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "Email Address"),
+            (
+                r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+                "Potential Credit Card",
+            ),
+            (
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                "Email Address",
+            ),
             (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "IP Address"),
             (r"password|pwd|passwd|secret|token", "Potential Secret"),
         ];
@@ -366,31 +376,38 @@ impl InputValidator {
     /// Validate proof type string
     pub fn validate_proof_type(proof_type: &str) -> Result<()> {
         let valid_types = vec![
-            "integrity", "row-count", "schema", "statistics",
-            "transformation", "data-split", "custom"
+            "integrity",
+            "row-count",
+            "schema",
+            "statistics",
+            "transformation",
+            "data-split",
+            "custom",
         ];
-        
+
         if !valid_types.contains(&proof_type) {
-            return Err(LedgerError::InvalidInput(
-                format!("Invalid proof type '{}'. Valid types: {}", 
-                        proof_type, valid_types.join(", "))
-            ));
+            return Err(LedgerError::InvalidInput(format!(
+                "Invalid proof type '{}'. Valid types: {}",
+                proof_type,
+                valid_types.join(", ")
+            )));
         }
-        
+
         Ok(())
     }
 
     /// Validate hash algorithm string
     pub fn validate_hash_algorithm(algorithm: &str) -> Result<()> {
         let valid_algorithms = vec!["sha3-256", "blake3"];
-        
+
         if !valid_algorithms.contains(&algorithm) {
-            return Err(LedgerError::InvalidInput(
-                format!("Invalid hash algorithm '{}'. Valid algorithms: {}", 
-                        algorithm, valid_algorithms.join(", "))
-            ));
+            return Err(LedgerError::InvalidInput(format!(
+                "Invalid hash algorithm '{}'. Valid algorithms: {}",
+                algorithm,
+                valid_algorithms.join(", ")
+            )));
         }
-        
+
         Ok(())
     }
 
@@ -398,7 +415,7 @@ impl InputValidator {
     pub fn validate_split_ratio(ratio: f64) -> Result<()> {
         if ratio <= 0.0 || ratio >= 1.0 {
             return Err(LedgerError::InvalidInput(
-                "Split ratio must be between 0.0 and 1.0 (exclusive)".to_string()
+                "Split ratio must be between 0.0 and 1.0 (exclusive)".to_string(),
             ));
         }
         Ok(())
@@ -409,13 +426,13 @@ impl InputValidator {
         for (key, value) in params {
             if key.is_empty() || value.is_empty() {
                 return Err(LedgerError::InvalidInput(
-                    "Parameter keys and values cannot be empty".to_string()
+                    "Parameter keys and values cannot be empty".to_string(),
                 ));
             }
-            
+
             if key.len() > 100 || value.len() > 1000 {
                 return Err(LedgerError::InvalidInput(
-                    "Parameter key/value too long".to_string()
+                    "Parameter key/value too long".to_string(),
                 ));
             }
         }
@@ -457,11 +474,11 @@ mod tests {
     #[test]
     fn test_path_validation() {
         let validator = SecurityValidator::new(SecurityConfig::default());
-        
+
         // Should reject path traversal
         assert!(validator.validate_file_path("../../../etc/passwd").is_err());
         assert!(validator.validate_file_path("~/secret.txt").is_err());
-        
+
         // Should reject invalid extensions
         assert!(validator.validate_file_path("test.exe").is_err());
     }
@@ -469,23 +486,27 @@ mod tests {
     #[test]
     fn test_dataset_name_sanitization() {
         let validator = SecurityValidator::new(SecurityConfig::default());
-        
-        let sanitized = validator.sanitize_dataset_name("test-dataset_v1.0").unwrap();
+
+        let sanitized = validator
+            .sanitize_dataset_name("test-dataset_v1.0")
+            .unwrap();
         assert_eq!(sanitized, "test-dataset_v1.0");
-        
-        let sanitized = validator.sanitize_dataset_name("test<script>alert()</script>").unwrap();
+
+        let sanitized = validator
+            .sanitize_dataset_name("test<script>alert()</script>")
+            .unwrap();
         assert_eq!(sanitized, "testscriptalertscript");
     }
 
     #[test]
     fn test_rate_limiting() {
         let mut validator = SecurityValidator::new(SecurityConfig::default());
-        
+
         // Should allow within limits
         for _ in 0..50 {
             assert!(validator.check_rate_limit("client1").is_ok());
         }
-        
+
         // Should reject when over limit
         for _ in 50..120 {
             validator.check_rate_limit("client1").ok();
@@ -497,10 +518,10 @@ mod tests {
     fn test_input_validation() {
         assert!(InputValidator::validate_proof_type("integrity").is_ok());
         assert!(InputValidator::validate_proof_type("invalid").is_err());
-        
+
         assert!(InputValidator::validate_hash_algorithm("sha3-256").is_ok());
         assert!(InputValidator::validate_hash_algorithm("md5").is_err());
-        
+
         assert!(InputValidator::validate_split_ratio(0.8).is_ok());
         assert!(InputValidator::validate_split_ratio(1.5).is_err());
     }

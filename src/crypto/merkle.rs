@@ -26,7 +26,9 @@ impl MerkleTree {
     /// Create a new Merkle tree from leaf data.
     pub fn new(leaves: Vec<Vec<u8>>, algorithm: HashAlgorithm) -> Result<Self, LedgerError> {
         if leaves.is_empty() {
-            return Err(LedgerError::InvalidInput("Cannot create tree with no leaves".to_string()));
+            return Err(LedgerError::InvalidInput(
+                "Cannot create tree with no leaves".to_string(),
+            ));
         }
 
         // Hash all leaf data
@@ -70,9 +72,14 @@ impl MerkleTree {
     }
 
     /// Create a new Merkle tree from string hashes.
-    pub fn from_hashes(leaf_hashes: Vec<String>, algorithm: HashAlgorithm) -> Result<Self, LedgerError> {
+    pub fn from_hashes(
+        leaf_hashes: Vec<String>,
+        algorithm: HashAlgorithm,
+    ) -> Result<Self, LedgerError> {
         if leaf_hashes.is_empty() {
-            return Err(LedgerError::InvalidInput("Cannot create tree with no leaves".to_string()));
+            return Err(LedgerError::InvalidInput(
+                "Cannot create tree with no leaves".to_string(),
+            ));
         }
 
         let mut levels = vec![leaf_hashes.clone()];
@@ -141,7 +148,10 @@ impl MerkleTree {
     }
 
     /// Verify a Merkle proof.
-    pub fn verify_proof(proof: &MerkleProof, algorithm: HashAlgorithm) -> Result<bool, LedgerError> {
+    pub fn verify_proof(
+        proof: &MerkleProof,
+        algorithm: HashAlgorithm,
+    ) -> Result<bool, LedgerError> {
         let mut current_hash = proof.leaf_hash.clone();
         let mut current_index = proof.leaf_index;
 
@@ -179,7 +189,7 @@ impl MerkleTree {
         let mut new_leaves = self.leaves.clone();
         let new_leaf_hash = hash_bytes(leaf_data, self.algorithm.clone())?;
         new_leaves.push(new_leaf_hash);
-        
+
         Self::from_hashes(new_leaves, self.algorithm.clone())
     }
 }
@@ -252,7 +262,7 @@ mod tests {
         ];
 
         let tree = MerkleTree::new(leaves, HashAlgorithm::Sha3_256).unwrap();
-        
+
         for i in 0..tree.leaf_count() {
             let proof = tree.generate_proof(i).unwrap();
             let is_valid = MerkleTree::verify_proof(&proof, HashAlgorithm::Sha3_256).unwrap();
@@ -264,7 +274,7 @@ mod tests {
     fn test_single_leaf_tree() {
         let leaves = vec![b"single_leaf".to_vec()];
         let tree = MerkleTree::new(leaves, HashAlgorithm::Blake3).unwrap();
-        
+
         assert_eq!(tree.leaf_count(), 1);
         let proof = tree.generate_proof(0).unwrap();
         let is_valid = MerkleTree::verify_proof(&proof, HashAlgorithm::Blake3).unwrap();
@@ -282,7 +292,7 @@ mod tests {
     fn test_append_leaf() {
         let leaves = vec![b"leaf1".to_vec(), b"leaf2".to_vec()];
         let tree = MerkleTree::new(leaves, HashAlgorithm::Sha3_256).unwrap();
-        
+
         let new_tree = tree.append_leaf(b"leaf3").unwrap();
         assert_eq!(new_tree.leaf_count(), 3);
         assert_ne!(tree.root, new_tree.root);
@@ -291,10 +301,10 @@ mod tests {
     #[test]
     fn test_different_algorithms() {
         let leaves = vec![b"test".to_vec()];
-        
+
         let tree_sha3 = MerkleTree::new(leaves.clone(), HashAlgorithm::Sha3_256).unwrap();
         let tree_blake3 = MerkleTree::new(leaves, HashAlgorithm::Blake3).unwrap();
-        
+
         assert_ne!(tree_sha3.root, tree_blake3.root);
     }
 }

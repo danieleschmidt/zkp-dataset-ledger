@@ -2,7 +2,7 @@
 
 use crate::crypto::hash::{hash_bytes, HashAlgorithm};
 use crate::crypto::merkle::MerkleTree;
-use crate::storage::{Storage, MemoryStorage};
+use crate::storage::{MemoryStorage, Storage};
 use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,20 +57,20 @@ pub struct LedgerEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operation {
     /// Initial dataset notarization
-    Notarize { 
+    Notarize {
         dataset_size: u64,
         row_count: Option<u64>,
         column_count: Option<u64>,
     },
     /// Data transformation operation
-    Transform { 
-        from: String, 
+    Transform {
+        from: String,
         operation: String,
         parameters: HashMap<String, String>,
     },
     /// Train/test split operation
-    Split { 
-        ratio: f64, 
+    Split {
+        ratio: f64,
         seed: Option<u64>,
         stratify: Option<String>,
     },
@@ -155,7 +155,7 @@ impl Ledger {
         // Create the ledger entry
         let entry_id = Uuid::new_v4().to_string();
         let block_height = self.get_latest_block_height()? + 1;
-        
+
         let operation = Operation::Notarize {
             dataset_size: dataset.size,
             row_count: dataset.row_count,
@@ -183,7 +183,7 @@ impl Ledger {
 
         // Store the entry
         self.store_entry(&entry)?;
-        
+
         // Update cache
         if self.entries_cache.len() < self.config.max_cache_entries {
             self.entries_cache.insert(entry_id, entry);
@@ -237,7 +237,7 @@ impl Ledger {
         };
 
         self.store_entry(&entry)?;
-        
+
         if self.entries_cache.len() < self.config.max_cache_entries {
             self.entries_cache.insert(entry_id.clone(), entry);
         }
@@ -283,7 +283,7 @@ impl Ledger {
         };
 
         self.store_entry(&entry)?;
-        
+
         if self.entries_cache.len() < self.config.max_cache_entries {
             self.entries_cache.insert(entry_id.clone(), entry);
         }
@@ -312,8 +312,8 @@ impl Ledger {
 
         for key in all_keys {
             if let Some(entry_data) = self.storage.get(&key)? {
-                let entry: LedgerEntry = bincode::deserialize(&entry_data)
-                    .map_err(|e| LedgerError::Serialization(e))?;
+                let entry: LedgerEntry =
+                    bincode::deserialize(&entry_data).map_err(|e| LedgerError::Serialization(e))?;
 
                 // Apply filters
                 if let Some(dataset_name) = &query.dataset_name {
@@ -352,7 +352,7 @@ impl Ledger {
     /// Get a summary of the ledger state.
     pub fn get_summary(&self) -> Result<LedgerSummary> {
         let all_entries = self.query_entries(&LedgerQuery::default())?;
-        
+
         let total_entries = all_entries.len();
         let mut datasets_tracked = std::collections::HashSet::new();
         let mut operations_by_type = HashMap::new();
@@ -360,7 +360,7 @@ impl Ledger {
 
         for entry in &all_entries {
             datasets_tracked.insert(entry.dataset_name.clone());
-            
+
             let op_type = entry.operation.operation_type();
             *operations_by_type.entry(op_type).or_insert(0) += 1;
 
@@ -401,7 +401,7 @@ impl Ledger {
         for i in 1..entries.len() {
             let current = &entries[i];
             let previous = &entries[i - 1];
-            
+
             if let Some(parent_hash) = &current.parent_hash {
                 let expected_parent_hash = self.compute_entry_hash(previous)?;
                 if *parent_hash != expected_parent_hash {
@@ -416,8 +416,7 @@ impl Ledger {
     /// Export ledger entries to JSON format.
     pub fn export_to_json(&self, query: &LedgerQuery) -> Result<String> {
         let entries = self.query_entries(query)?;
-        serde_json::to_string_pretty(&entries)
-            .map_err(|e| LedgerError::Json(e))
+        serde_json::to_string_pretty(&entries).map_err(|e| LedgerError::Json(e))
     }
 
     /// Helper methods
@@ -429,7 +428,7 @@ impl Ledger {
         } else {
             bincode::serialize(entry).map_err(|e| LedgerError::Serialization(e))?
         };
-        
+
         self.storage.put(&key, &data)?;
         Ok(())
     }
@@ -447,7 +446,7 @@ impl Ledger {
             limit: Some(1),
             ..LedgerQuery::default()
         })?;
-        
+
         if let Some(entry) = entries.last() {
             Ok(Some(self.compute_entry_hash(entry)?))
         } else {
@@ -519,7 +518,9 @@ mod tests {
         let dataset = Dataset::from_path(&temp_path).unwrap();
         let config = ProofConfig::default();
 
-        let proof = ledger.notarize_dataset(dataset, "test-dataset", config).unwrap();
+        let proof = ledger
+            .notarize_dataset(dataset, "test-dataset", config)
+            .unwrap();
         assert!(!proof.dataset_hash.is_empty());
 
         let history = ledger.get_dataset_history("test-dataset").unwrap();
@@ -543,20 +544,24 @@ mod tests {
         let config = ProofConfig::default();
 
         // First notarize the original dataset
-        ledger.notarize_dataset(dataset.clone(), "original", config.clone()).unwrap();
+        ledger
+            .notarize_dataset(dataset.clone(), "original", config.clone())
+            .unwrap();
 
         // Then record a transformation
         let transform_proof = Proof::generate(&dataset, &config).unwrap();
         let mut params = HashMap::new();
         params.insert("operation".to_string(), "normalize".to_string());
 
-        let transform_id = ledger.record_transformation(
-            "original",
-            "transformed",
-            "normalize",
-            params,
-            transform_proof,
-        ).unwrap();
+        let transform_id = ledger
+            .record_transformation(
+                "original",
+                "transformed",
+                "normalize",
+                params,
+                transform_proof,
+            )
+            .unwrap();
 
         assert!(!transform_id.is_empty());
 
@@ -569,7 +574,7 @@ mod tests {
     #[test]
     fn test_ledger_summary() {
         let mut ledger = Ledger::new("test-ledger").unwrap();
-        
+
         // Create a test dataset and notarize it
         let mut temp_file = NamedTempFile::new().unwrap();
         writeln!(temp_file, "test_data").unwrap();
@@ -581,7 +586,9 @@ mod tests {
         let dataset = Dataset::from_path(&temp_path).unwrap();
         let config = ProofConfig::default();
 
-        ledger.notarize_dataset(dataset, "test-dataset", config).unwrap();
+        ledger
+            .notarize_dataset(dataset, "test-dataset", config)
+            .unwrap();
 
         let summary = ledger.get_summary().unwrap();
         assert_eq!(summary.name, "test-ledger");
@@ -595,7 +602,7 @@ mod tests {
     #[test]
     fn test_chain_integrity() {
         let mut ledger = Ledger::new("test-ledger").unwrap();
-        
+
         // Add multiple entries
         for i in 0..3 {
             let mut temp_file = NamedTempFile::new().unwrap();
@@ -608,7 +615,9 @@ mod tests {
             let dataset = Dataset::from_path(&temp_path).unwrap();
             let config = ProofConfig::default();
 
-            ledger.notarize_dataset(dataset, &format!("dataset-{}", i), config).unwrap();
+            ledger
+                .notarize_dataset(dataset, &format!("dataset-{}", i), config)
+                .unwrap();
 
             std::fs::remove_file(temp_path).ok();
         }
