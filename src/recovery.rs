@@ -3,8 +3,7 @@
 use crate::{LedgerError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Backup configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,7 +31,7 @@ impl Default for BackupConfig {
         Self {
             enable_auto_backup: true,
             backup_interval_hours: 24, // Daily backups
-            max_backup_count: 7, // Keep 7 days
+            max_backup_count: 7,       // Keep 7 days
             backup_directory: PathBuf::from("./backups"),
             compression_level: 6,
             enable_incremental: true,
@@ -88,7 +87,7 @@ impl BackupRecoverySystem {
     pub fn new(config: BackupConfig) -> Result<Self> {
         // Create backup directory if it doesn't exist
         std::fs::create_dir_all(&config.backup_directory)?;
-        
+
         Ok(Self {
             config,
             recovery_points: Vec::new(),
@@ -97,16 +96,24 @@ impl BackupRecoverySystem {
     }
 
     /// Create a full backup of the ledger
-    pub fn create_full_backup(&mut self, ledger_data: &[u8], entries_count: u64) -> Result<BackupMetadata> {
+    pub fn create_full_backup(
+        &mut self,
+        ledger_data: &[u8],
+        entries_count: u64,
+    ) -> Result<BackupMetadata> {
         let backup_id = uuid::Uuid::new_v4().to_string();
-        let backup_path = self.config.backup_directory
+        let backup_path = self
+            .config
+            .backup_directory
             .join(format!("full_backup_{}.zkpbackup", backup_id));
 
         tracing::info!(backup_id = %backup_id, "Creating full backup");
 
         // Calculate checksum
-        let checksum = crate::crypto::hash::hash_bytes(ledger_data, 
-            crate::crypto::hash::HashAlgorithm::default())?;
+        let checksum = crate::crypto::hash::hash_bytes(
+            ledger_data,
+            crate::crypto::hash::HashAlgorithm::default(),
+        )?;
 
         // Create backup file
         let mut backup_data = ledger_data.to_vec();
@@ -148,7 +155,7 @@ impl BackupRecoverySystem {
         }
 
         self.last_backup = Some(metadata.created_at);
-        
+
         // Clean up old backups
         self.cleanup_old_backups()?;
 
@@ -159,25 +166,29 @@ impl BackupRecoverySystem {
 
     /// Create an incremental backup
     pub fn create_incremental_backup(
-        &mut self, 
-        changed_data: &[u8], 
+        &mut self,
+        changed_data: &[u8],
         base_backup_id: &str,
-        entries_count: u64
+        entries_count: u64,
     ) -> Result<BackupMetadata> {
         if !self.config.enable_incremental {
             return Err(LedgerError::ConfigError(
-                "Incremental backups are disabled".to_string()
+                "Incremental backups are disabled".to_string(),
             ));
         }
 
         let backup_id = uuid::Uuid::new_v4().to_string();
-        let backup_path = self.config.backup_directory
+        let backup_path = self
+            .config
+            .backup_directory
             .join(format!("incr_backup_{}.zkpbackup", backup_id));
 
         tracing::info!(backup_id = %backup_id, base = %base_backup_id, "Creating incremental backup");
 
-        let checksum = crate::crypto::hash::hash_bytes(changed_data, 
-            crate::crypto::hash::HashAlgorithm::default())?;
+        let checksum = crate::crypto::hash::hash_bytes(
+            changed_data,
+            crate::crypto::hash::HashAlgorithm::default(),
+        )?;
 
         let mut backup_data = changed_data.to_vec();
         let compressed = if self.config.compression_level > 0 {
@@ -230,9 +241,10 @@ impl BackupRecoverySystem {
         let backup_path = self.get_backup_path(&metadata);
 
         if !backup_path.exists() {
-            return Err(LedgerError::InvalidInput(
-                format!("Backup file not found: {}", backup_path.display())
-            ));
+            return Err(LedgerError::InvalidInput(format!(
+                "Backup file not found: {}",
+                backup_path.display()
+            )));
         }
 
         let mut backup_data = std::fs::read(&backup_path)?;
@@ -248,11 +260,13 @@ impl BackupRecoverySystem {
         }
 
         // Verify checksum
-        let checksum = crate::crypto::hash::hash_bytes(&backup_data, 
-            crate::crypto::hash::HashAlgorithm::default())?;
+        let checksum = crate::crypto::hash::hash_bytes(
+            &backup_data,
+            crate::crypto::hash::HashAlgorithm::default(),
+        )?;
         if checksum != metadata.checksum {
             return Err(LedgerError::InvalidInput(
-                "Backup checksum verification failed".to_string()
+                "Backup checksum verification failed".to_string(),
             ));
         }
 
@@ -270,7 +284,11 @@ impl BackupRecoverySystem {
     }
 
     /// Create a recovery point
-    pub fn create_recovery_point(&mut self, ledger_state_hash: &str, entries_count: u64) -> Result<RecoveryPoint> {
+    pub fn create_recovery_point(
+        &mut self,
+        ledger_state_hash: &str,
+        entries_count: u64,
+    ) -> Result<RecoveryPoint> {
         let recovery_point = RecoveryPoint {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: Utc::now(),
@@ -300,17 +318,17 @@ impl BackupRecoverySystem {
     /// Verify the integrity of a backup
     pub fn verify_backup(&self, metadata: &BackupMetadata) -> Result<()> {
         let backup_path = self.get_backup_path(metadata);
-        
+
         if !backup_path.exists() {
             return Err(LedgerError::InvalidInput(
-                "Backup file does not exist".to_string()
+                "Backup file does not exist".to_string(),
             ));
         }
 
         let file_size = std::fs::metadata(&backup_path)?.len();
         if file_size != metadata.size_bytes {
             return Err(LedgerError::InvalidInput(
-                "Backup file size mismatch".to_string()
+                "Backup file size mismatch".to_string(),
             ));
         }
 
@@ -330,9 +348,8 @@ impl BackupRecoverySystem {
         }
 
         if let Some(last_backup) = self.last_backup {
-            let hours_since_backup = Utc::now()
-                .signed_duration_since(last_backup)
-                .num_hours() as u32;
+            let hours_since_backup =
+                Utc::now().signed_duration_since(last_backup).num_hours() as u32;
             hours_since_backup >= self.config.backup_interval_hours
         } else {
             true // No previous backup
@@ -344,7 +361,7 @@ impl BackupRecoverySystem {
         let backup_dir = &self.config.backup_directory;
         let mut total_size = 0u64;
         let mut backup_count = 0u32;
-        
+
         if backup_dir.exists() {
             for entry in std::fs::read_dir(backup_dir)? {
                 let entry = entry?;
@@ -388,7 +405,9 @@ impl BackupRecoverySystem {
     }
 
     fn save_backup_metadata(&self, metadata: &BackupMetadata) -> Result<()> {
-        let metadata_path = self.config.backup_directory
+        let metadata_path = self
+            .config
+            .backup_directory
             .join(format!("{}.metadata", metadata.backup_id));
         let metadata_json = serde_json::to_string_pretty(metadata)?;
         std::fs::write(metadata_path, metadata_json)?;
@@ -396,7 +415,9 @@ impl BackupRecoverySystem {
     }
 
     fn get_backup_metadata(&self, backup_id: &str) -> Result<BackupMetadata> {
-        let metadata_path = self.config.backup_directory
+        let metadata_path = self
+            .config
+            .backup_directory
             .join(format!("{}.metadata", backup_id));
         let metadata_json = std::fs::read_to_string(metadata_path)?;
         let metadata: BackupMetadata = serde_json::from_str(&metadata_json)?;
@@ -413,7 +434,11 @@ impl BackupRecoverySystem {
         self.config.backup_directory.join(filename)
     }
 
-    fn apply_incremental_backup(&self, base_data: &[u8], incremental_data: &[u8]) -> Result<Vec<u8>> {
+    fn apply_incremental_backup(
+        &self,
+        base_data: &[u8],
+        incremental_data: &[u8],
+    ) -> Result<Vec<u8>> {
         // Simplified incremental application - in production, implement proper diff/patch
         let mut result = base_data.to_vec();
         result.extend_from_slice(incremental_data);
@@ -423,13 +448,14 @@ impl BackupRecoverySystem {
     fn cleanup_old_backups(&self) -> Result<()> {
         // Get all backup files and sort by creation time
         let mut backups = Vec::new();
-        
+
         for entry in std::fs::read_dir(&self.config.backup_directory)? {
             let entry = entry?;
             if let Some(ext) = entry.path().extension() {
                 if ext == "metadata" {
                     let metadata_content = std::fs::read_to_string(entry.path())?;
-                    if let Ok(metadata) = serde_json::from_str::<BackupMetadata>(&metadata_content) {
+                    if let Ok(metadata) = serde_json::from_str::<BackupMetadata>(&metadata_content)
+                    {
                         backups.push(metadata);
                     }
                 }
@@ -443,16 +469,18 @@ impl BackupRecoverySystem {
         if backups.len() > self.config.max_backup_count as usize {
             for backup in backups.iter().skip(self.config.max_backup_count as usize) {
                 let backup_path = self.get_backup_path(backup);
-                let metadata_path = self.config.backup_directory
+                let metadata_path = self
+                    .config
+                    .backup_directory
                     .join(format!("{}.metadata", backup.backup_id));
-                
+
                 if backup_path.exists() {
                     std::fs::remove_file(&backup_path)?;
                 }
                 if metadata_path.exists() {
                     std::fs::remove_file(&metadata_path)?;
                 }
-                
+
                 tracing::info!(backup_id = %backup.backup_id, "Old backup cleaned up");
             }
         }
@@ -508,8 +536,8 @@ pub struct CircuitBreaker {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CircuitBreakerState {
-    Closed,  // Normal operation
-    Open,    // Failing fast
+    Closed,   // Normal operation
+    Open,     // Failing fast
     HalfOpen, // Testing if service recovered
 }
 
@@ -532,7 +560,7 @@ impl CircuitBreaker {
                     let time_since_failure = Utc::now()
                         .signed_duration_since(last_failure)
                         .num_milliseconds() as u64;
-                    
+
                     if time_since_failure >= self.reset_timeout_ms {
                         self.state = CircuitBreakerState::HalfOpen;
                         true
@@ -556,7 +584,7 @@ impl CircuitBreaker {
     pub fn record_failure(&mut self) {
         self.current_failures += 1;
         self.last_failure_time = Some(Utc::now());
-        
+
         if self.current_failures >= self.failure_threshold {
             self.state = CircuitBreakerState::Open;
         }
@@ -579,22 +607,22 @@ mod tests {
     #[test]
     fn test_circuit_breaker() {
         let mut breaker = CircuitBreaker::new(3, 1000);
-        
+
         // Should allow execution initially
         assert!(breaker.can_execute());
         assert_eq!(breaker.state, CircuitBreakerState::Closed);
-        
+
         // Record failures
         breaker.record_failure();
         breaker.record_failure();
         assert!(breaker.can_execute());
         assert_eq!(breaker.state, CircuitBreakerState::Closed);
-        
+
         // Third failure should open circuit
         breaker.record_failure();
         assert_eq!(breaker.state, CircuitBreakerState::Open);
         assert!(!breaker.can_execute());
-        
+
         // Success should close circuit
         breaker.record_success();
         assert_eq!(breaker.state, CircuitBreakerState::Closed);
@@ -608,17 +636,19 @@ mod tests {
             backup_directory: temp_dir.path().to_path_buf(),
             ..BackupConfig::default()
         };
-        
+
         let mut backup_system = BackupRecoverySystem::new(config).unwrap();
-        
+
         let test_data = b"test ledger data";
         let metadata = backup_system.create_full_backup(test_data, 10).unwrap();
-        
+
         assert_eq!(metadata.backup_type, BackupType::Full);
         assert_eq!(metadata.ledger_entries_count, 10);
-        
+
         // Test restore
-        let restored_data = backup_system.restore_from_backup(&metadata.backup_id).unwrap();
+        let restored_data = backup_system
+            .restore_from_backup(&metadata.backup_id)
+            .unwrap();
         assert_eq!(restored_data, test_data);
     }
 
@@ -629,13 +659,13 @@ mod tests {
             backup_directory: temp_dir.path().to_path_buf(),
             ..BackupConfig::default()
         };
-        
+
         let mut backup_system = BackupRecoverySystem::new(config).unwrap();
-        
+
         let recovery_point = backup_system.create_recovery_point("test_hash", 5).unwrap();
         assert_eq!(recovery_point.entries_count, 5);
         assert_eq!(recovery_point.ledger_state_hash, "test_hash");
-        
+
         let points = backup_system.get_recovery_points();
         assert_eq!(points.len(), 1);
         assert_eq!(points[0].id, recovery_point.id);

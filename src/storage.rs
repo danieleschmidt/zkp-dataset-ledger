@@ -3,7 +3,6 @@
 use crate::error::LedgerError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Trait for storage backend implementations.
 pub trait Storage: Send + Sync {
@@ -93,9 +92,139 @@ impl Storage for MemoryStorage {
     }
 }
 
-// RocksDB storage backend temporarily disabled due to build dependencies
-// #[cfg(feature = "rocksdb")]
-// pub mod rocksdb_backend { ... }
+/// RocksDB storage backend for high-performance persistent storage.
+#[cfg(feature = "rocksdb")]
+pub mod rocksdb_backend {
+    use super::{Storage, StorageStats};
+    use crate::error::LedgerError;
+    use rocksdb::{Options, DB};
+    use std::path::Path;
+    use std::sync::Arc;
+
+    /// RocksDB storage implementation
+    pub struct RocksDBStorage {
+        db: Arc<DB>,
+        path: String,
+    }
+
+    impl RocksDBStorage {
+        /// Create a new RocksDB storage instance
+        pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, LedgerError> {
+            let mut opts = Options::default();
+            opts.create_if_missing(true);
+            opts.set_compression_type(rocksdb::DBCompressionType::Zstd);
+            
+            // Performance optimizations
+            opts.set_max_background_jobs(6);
+            opts.set_write_buffer_size(128 * 1024 * 1024); // 128MB
+            opts.set_target_file_size_base(64 * 1024 * 1024); // 64MB
+            opts.set_level_zero_file_num_compaction_trigger(4);
+            opts.set_level_zero_slowdown_writes_trigger(20);
+            opts.set_level_zero_stop_writes_trigger(36);
+            
+            // Enable bloom filters for faster reads
+            let mut block_opts = rocksdb::BlockBasedOptions::default();
+            block_opts.set_bloom_filter(10.0, false);
+            block_opts.set_cache_index_and_filter_blocks(true);
+            opts.set_block_based_table_factory(&block_opts);
+
+            let path_str = path.as_ref().to_string_lossy().to_string();
+            let db = DB::open(&opts, &path_str)
+                .map_err(|e| LedgerError::StorageError(format!("Failed to open RocksDB: {}", e)))?;
+
+            Ok(RocksDBStorage {
+                db: Arc::new(db),
+                path: path_str,
+            })
+        }
+
+        /// Compact the database to optimize storage
+        pub fn compact(&self) -> Result<(), LedgerError> {
+            self.db.compact_range(None::<&[u8]>, None::<&[u8]>);
+            Ok(())
+        }
+
+        /// Get database statistics
+        pub fn get_property(&self, property: &str) -> Result<Option<String>, LedgerError> {
+            Ok(self.db.property_value(property)
+                .map_err(|e| LedgerError::StorageError(format!("Property query failed: {}", e)))?)
+        }
+    }
+
+    impl Storage for RocksDBStorage {
+        fn put(&mut self, key: &str, value: &[u8]) -> Result<(), LedgerError> {
+            self.db
+                .put(key.as_bytes(), value)
+                .map_err(|e| LedgerError::StorageError(format!("Put operation failed: {}", e)))
+        }
+
+        fn get(&self, key: &str) -> Result<Option<Vec<u8>>, LedgerError> {
+            self.db
+                .get(key.as_bytes())
+                .map_err(|e| LedgerError::StorageError(format!("Get operation failed: {}", e)))
+        }
+
+        fn delete(&mut self, key: &str) -> Result<(), LedgerError> {
+            self.db
+                .delete(key.as_bytes())
+                .map_err(|e| LedgerError::StorageError(format!("Delete operation failed: {}", e)))
+        }
+
+        fn list_keys(&self, prefix: &str) -> Result<Vec<String>, LedgerError> {
+            let mut keys = Vec::new();
+            let iter = self.db.prefix_iterator(prefix.as_bytes());
+            
+            for item in iter {
+                match item {
+                    Ok((key, _)) => {
+                        if let Ok(key_str) = String::from_utf8(key.to_vec()) {
+                            if key_str.starts_with(prefix) {
+                                keys.push(key_str);
+                            } else {
+                                break; // Prefix iteration finished
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        return Err(LedgerError::StorageError(format!(
+                            "Iterator error: {}", e
+                        )));
+                    }
+                }
+            }
+
+            Ok(keys)
+        }
+
+        fn exists(&self, key: &str) -> Result<bool, LedgerError> {
+            match self.get(key)? {
+                Some(_) => Ok(true),
+                None => Ok(false),
+            }
+        }
+
+        fn stats(&self) -> Result<StorageStats, LedgerError> {
+            // Get approximate key count
+            let num_keys = self.get_property("rocksdb.estimate-num-keys")?
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+
+            // Get approximate size
+            let size_bytes = self.get_property("rocksdb.total-sst-files-size")?
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
+
+            Ok(StorageStats {
+                total_keys: num_keys,
+                total_size_bytes: size_bytes,
+                backend_type: "rocksdb".to_string(),
+            })
+        }
+    }
+}
+
+#[cfg(feature = "rocksdb")]
+pub use rocksdb_backend::RocksDBStorage;
 
 /// PostgreSQL storage backend.
 #[cfg(feature = "postgres")]
@@ -249,6 +378,18 @@ pub mod postgres_backend {
 pub fn create_storage(backend_type: &str, config: &str) -> Result<Box<dyn Storage>, LedgerError> {
     match backend_type {
         "memory" => Ok(Box::new(MemoryStorage::new())),
+
+        #[cfg(feature = "rocksdb")]
+        "rocksdb" => {
+            use rocksdb_backend::RocksDBStorage;
+            let path = if config.is_empty() {
+                "./zkp_ledger.db"
+            } else {
+                config
+            };
+            let storage = RocksDBStorage::new(path)?;
+            Ok(Box::new(storage))
+        }
 
         #[cfg(feature = "postgres")]
         "postgres" => {

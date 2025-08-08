@@ -1,13 +1,13 @@
 //! Performance optimization and scaling features for ZKP Dataset Ledger
 
 use crate::{LedgerError, Result};
+use chrono::Utc;
+use futures::stream::{FuturesUnordered, StreamExt};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, Semaphore};
-use futures::stream::{FuturesUnordered, StreamExt};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use tokio::sync::Semaphore;
 
 /// Performance configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,7 +125,7 @@ where
 
     pub async fn put_with_ttl(&self, key: K, value: V, ttl: Duration) {
         let item = CacheItem::new(value, ttl);
-        
+
         {
             let mut cache = self.cache.write().unwrap();
             cache.insert(key.clone(), item);
@@ -182,7 +182,9 @@ where
         let to_evict = current_size - self.max_size;
         let keys_to_remove: Vec<K> = {
             let mut access_order = self.access_order.lock().unwrap();
-            (0..to_evict).filter_map(|_| access_order.pop_front()).collect()
+            (0..to_evict)
+                .filter_map(|_| access_order.pop_front())
+                .collect()
         };
 
         {
@@ -207,7 +209,11 @@ impl ParallelProcessor {
     }
 
     /// Process tasks in parallel with concurrency control
-    pub async fn process_parallel<T, R, F, Fut>(&self, tasks: Vec<T>, processor: F) -> Result<Vec<R>>
+    pub async fn process_parallel<T, R, F, Fut>(
+        &self,
+        tasks: Vec<T>,
+        processor: F,
+    ) -> Result<Vec<R>>
     where
         F: Fn(T) -> Fut + Send + Sync + Clone + 'static,
         Fut: std::future::Future<Output = Result<R>> + Send + 'static,
@@ -230,13 +236,14 @@ impl ParallelProcessor {
         for task in tasks {
             let processor = processor.clone();
             let semaphore = semaphore.clone();
-            
+
             let future = async move {
-                let _permit = semaphore.acquire().await
-                    .map_err(|_| LedgerError::InvalidInput("Failed to acquire semaphore".to_string()))?;
+                let _permit = semaphore.acquire().await.map_err(|_| {
+                    LedgerError::InvalidInput("Failed to acquire semaphore".to_string())
+                })?;
                 processor(task).await
             };
-            
+
             futures.push(future);
         }
 
@@ -253,11 +260,11 @@ impl ParallelProcessor {
     where
         F: Fn(Vec<T>) -> Fut + Send + Sync + Clone + 'static,
         Fut: std::future::Future<Output = Result<Vec<R>>> + Send + 'static,
-        T: Send + 'static,
+        T: Send + 'static + Clone,
         R: Send + 'static,
     {
         let mut all_results = Vec::new();
-        
+
         for batch in tasks.chunks(self.config.batch_size) {
             let batch_results = processor(batch.to_vec()).await?;
             all_results.extend(batch_results);
@@ -316,13 +323,15 @@ where
         // Wait for connection to become available
         // In a real implementation, we'd use a proper waiting mechanism
         tokio::time::sleep(Duration::from_millis(10)).await;
-        self.get_connection().await
+        
+        // Use Box::pin to avoid infinite recursion in async fn
+        Box::pin(self.get_connection()).await
     }
 
     pub fn stats(&self) -> ConnectionPoolStats {
         let connections = self.connections.lock().unwrap();
         let current_size = self.current_size.lock().unwrap();
-        
+
         ConnectionPoolStats {
             total_connections: *current_size,
             available_connections: connections.len(),
@@ -402,11 +411,11 @@ impl StreamProcessor {
         R: Send,
     {
         let mut results = Vec::new();
-        
+
         while !data.is_empty() {
             let chunk_size = std::cmp::min(self.chunk_size, data.len());
             let chunk = data.drain(..chunk_size).collect();
-            
+
             let result = processor(chunk).await?;
             results.push(result);
         }
@@ -425,8 +434,8 @@ impl StreamProcessor {
         Fut: std::future::Future<Output = Result<R>> + Send,
         R: Send,
     {
-        use tokio::io::{AsyncReadExt, BufReader};
         use tokio::fs::File;
+        use tokio::io::{AsyncReadExt, BufReader};
 
         let file = File::open(file_path).await?;
         let mut reader = BufReader::new(file);
@@ -460,7 +469,7 @@ impl PerformanceOptimizer {
     pub fn new(config: PerformanceConfig) -> Self {
         let cache_ttl = Duration::from_secs(config.cache_ttl_seconds);
         let cache_size = config.cache_size_mb * 1024 * 1024 / 100; // Rough estimate
-        
+
         Self {
             cache: PerformanceCache::new(cache_size, cache_ttl),
             parallel_processor: ParallelProcessor::new(config.clone()),
@@ -502,10 +511,15 @@ impl PerformanceOptimizer {
         Ok(result)
     }
 
-    async fn process_with_streaming(&self, dataset_path: &str, _operation: &str) -> Result<Vec<u8>> {
+    async fn process_with_streaming(
+        &self,
+        dataset_path: &str,
+        _operation: &str,
+    ) -> Result<Vec<u8>> {
         let path = std::path::Path::new(dataset_path);
-        
-        let results = self.stream_processor
+
+        let results = self
+            .stream_processor
             .process_file_stream(path, |chunk| async move {
                 // Simulate processing - in real implementation, this would be actual operation
                 tokio::time::sleep(Duration::from_millis(1)).await;
@@ -520,13 +534,15 @@ impl PerformanceOptimizer {
 
     async fn process_with_parallel(&self, dataset_path: &str, _operation: &str) -> Result<Vec<u8>> {
         let data = tokio::fs::read(dataset_path).await?;
-        
+
         // Split data into chunks for parallel processing
-        let chunks: Vec<Vec<u8>> = data.chunks(self.config.batch_size)
+        let chunks: Vec<Vec<u8>> = data
+            .chunks(self.config.batch_size)
             .map(|chunk| chunk.to_vec())
             .collect();
 
-        let results = self.parallel_processor
+        let results = self
+            .parallel_processor
             .process_parallel(chunks, |chunk| async move {
                 // Simulate processing
                 tokio::time::sleep(Duration::from_millis(1)).await;
@@ -634,8 +650,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_performance_config_default() {
@@ -648,11 +664,11 @@ mod tests {
     #[tokio::test]
     async fn test_performance_cache() {
         let cache = PerformanceCache::new(2, Duration::from_secs(1));
-        
+
         cache.put("key1".to_string(), vec![1, 2, 3]).await;
         let value = cache.get(&"key1".to_string()).await;
         assert_eq!(value, Some(vec![1, 2, 3]));
-        
+
         // Test TTL expiration
         tokio::time::sleep(Duration::from_secs(2)).await;
         let expired_value = cache.get(&"key1".to_string()).await;
@@ -663,13 +679,16 @@ mod tests {
     async fn test_parallel_processor() {
         let config = PerformanceConfig::default();
         let processor = ParallelProcessor::new(config);
-        
+
         let tasks = vec![1, 2, 3, 4, 5];
-        let results = processor.process_parallel(tasks, |x| async move {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            Ok(x * 2)
-        }).await.unwrap();
-        
+        let results = processor
+            .process_parallel(tasks, |x| async move {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                Ok(x * 2)
+            })
+            .await
+            .unwrap();
+
         assert_eq!(results.len(), 5);
         assert!(results.contains(&2));
         assert!(results.contains(&10));
@@ -679,11 +698,12 @@ mod tests {
     async fn test_stream_processor() {
         let processor = StreamProcessor::new(1024);
         let data = vec![1u8; 2048]; // 2KB of data
-        
-        let results = processor.process_stream(data, |chunk| async move {
-            Ok(chunk.len())
-        }).await.unwrap();
-        
+
+        let results = processor
+            .process_stream(data, |chunk| async move { Ok(chunk.len()) })
+            .await
+            .unwrap();
+
         assert_eq!(results.len(), 2); // Two chunks
         assert_eq!(results[0], 1024);
         assert_eq!(results[1], 1024);
@@ -693,7 +713,7 @@ mod tests {
     fn test_load_balancer() {
         let instances = vec!["instance1", "instance2", "instance3"];
         let lb = LoadBalancer::new(instances, LoadBalancingStrategy::RoundRobin);
-        
+
         assert_eq!(lb.get_instance(), Some("instance1"));
         assert_eq!(lb.get_instance(), Some("instance2"));
         assert_eq!(lb.get_instance(), Some("instance3"));
@@ -704,15 +724,15 @@ mod tests {
     async fn test_performance_optimizer() {
         let mut temp_file = NamedTempFile::new().unwrap();
         writeln!(temp_file, "test data").unwrap();
-        
+
         let config = PerformanceConfig::default();
         let optimizer = PerformanceOptimizer::new(config);
-        
-        let result = optimizer.process_dataset_optimized(
-            temp_file.path().to_str().unwrap(),
-            "test_operation"
-        ).await.unwrap();
-        
+
+        let result = optimizer
+            .process_dataset_optimized(temp_file.path().to_str().unwrap(), "test_operation")
+            .await
+            .unwrap();
+
         assert!(!result.is_empty());
     }
 }

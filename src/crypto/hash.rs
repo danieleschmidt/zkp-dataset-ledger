@@ -85,10 +85,7 @@ pub fn hash_dataset_file<P: AsRef<std::path::Path>>(
 }
 
 /// Compute a hash of multiple values concatenated together.
-pub fn hash_combined(
-    values: &[&[u8]],
-    algorithm: HashAlgorithm,
-) -> Result<String, LedgerError> {
+pub fn hash_combined(values: &[&[u8]], algorithm: HashAlgorithm) -> Result<String, LedgerError> {
     match algorithm {
         HashAlgorithm::Sha3_256 => {
             let mut hasher = Sha3_256::new();
@@ -160,7 +157,7 @@ mod tests {
         let data = b"test data";
         let sha3_result = sha3_hash(data);
         let blake3_result = blake3_hash(data);
-        
+
         assert_eq!(sha3_result.len(), 32);
         assert_eq!(blake3_result.len(), 32);
     }
