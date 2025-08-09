@@ -4,9 +4,14 @@ use crate::{LedgerError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant, SystemTime};
 use uuid::Uuid;
+use std::path::Path;
+use std::io::Read;
+use tracing::{debug, info, warn, error};
 
-/// Security configuration for the ledger
+/// Comprehensive security configuration for the ledger
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityConfig {
     /// Enable access control
@@ -19,10 +24,62 @@ pub struct SecurityConfig {
     pub allowed_extensions: Vec<String>,
     /// Rate limiting: max operations per minute
     pub rate_limit_per_minute: u32,
-    /// Enable content scanning
+    /// Enable content scanning for sensitive data
     pub enable_content_scanning: bool,
     /// Trusted certificate authorities for proof verification
     pub trusted_cas: Vec<String>,
+    /// Enable memory protection and secure allocation
+    pub enable_memory_protection: bool,
+    /// Enable timing attack protection
+    pub enable_timing_protection: bool,
+    /// Maximum number of failed authentication attempts
+    pub max_auth_failures: u32,
+    /// Account lockout duration in seconds
+    pub lockout_duration_secs: u64,
+    /// Session timeout in seconds
+    pub session_timeout_secs: u64,
+    /// Enable secure random number generation
+    pub enable_secure_random: bool,
+    /// Minimum password/key entropy bits
+    pub min_entropy_bits: u32,
+    /// Enable input fuzzing protection
+    pub enable_input_fuzzing_protection: bool,
+    /// Maximum input length for text fields
+    pub max_input_length: usize,
+    /// Enable SQL injection protection
+    pub enable_sql_injection_protection: bool,
+    /// Enable XSS protection for web interfaces
+    pub enable_xss_protection: bool,
+    /// Enable CSRF protection
+    pub enable_csrf_protection: bool,
+    /// Allowed IP ranges for access (CIDR notation)
+    pub allowed_ip_ranges: Vec<String>,
+    /// Blocked IP addresses
+    pub blocked_ips: Vec<String>,
+    /// Enable brute force protection
+    pub enable_brute_force_protection: bool,
+    /// Enable honeypot traps
+    pub enable_honeypot_traps: bool,
+    /// Security headers to enforce
+    pub security_headers: HashMap<String, String>,
+    /// Enable data encryption at rest
+    pub enable_encryption_at_rest: bool,
+    /// Enable data encryption in transit
+    pub enable_encryption_in_transit: bool,
+    /// Encryption algorithm preferences
+    pub preferred_encryption_algorithms: Vec<String>,
+    /// Enable key rotation
+    pub enable_key_rotation: bool,
+    /// Key rotation interval in days
+    pub key_rotation_interval_days: u32,
+    /// Enable secure logging
+    pub enable_secure_logging: bool,
+    /// Log retention period in days
+    pub log_retention_days: u32,
+    /// Enable anomaly detection
+    pub enable_anomaly_detection: bool,
+    /// Anomaly detection sensitivity (0.0-1.0)
+    pub anomaly_detection_sensitivity: f64,
 }
 
 impl Default for SecurityConfig {
@@ -40,6 +97,43 @@ impl Default for SecurityConfig {
             rate_limit_per_minute: 100,
             enable_content_scanning: true,
             trusted_cas: vec![],
+            enable_memory_protection: true,
+            enable_timing_protection: true,
+            max_auth_failures: 3,
+            lockout_duration_secs: 300, // 5 minutes
+            session_timeout_secs: 3600, // 1 hour
+            enable_secure_random: true,
+            min_entropy_bits: 128,
+            enable_input_fuzzing_protection: true,
+            max_input_length: 10000,
+            enable_sql_injection_protection: true,
+            enable_xss_protection: true,
+            enable_csrf_protection: true,
+            allowed_ip_ranges: vec!["0.0.0.0/0".to_string()], // Allow all by default
+            blocked_ips: vec![],
+            enable_brute_force_protection: true,
+            enable_honeypot_traps: false,
+            security_headers: {
+                let mut headers = HashMap::new();
+                headers.insert("X-Frame-Options".to_string(), "DENY".to_string());
+                headers.insert("X-Content-Type-Options".to_string(), "nosniff".to_string());
+                headers.insert("X-XSS-Protection".to_string(), "1; mode=block".to_string());
+                headers.insert("Strict-Transport-Security".to_string(), "max-age=31536000; includeSubDomains".to_string());
+                headers.insert("Content-Security-Policy".to_string(), "default-src 'self'".to_string());
+                headers
+            },
+            enable_encryption_at_rest: true,
+            enable_encryption_in_transit: true,
+            preferred_encryption_algorithms: vec![
+                "AES-256-GCM".to_string(),
+                "ChaCha20-Poly1305".to_string(),
+            ],
+            enable_key_rotation: true,
+            key_rotation_interval_days: 90,
+            enable_secure_logging: true,
+            log_retention_days: 365,
+            enable_anomaly_detection: true,
+            anomaly_detection_sensitivity: 0.8,
         }
     }
 }

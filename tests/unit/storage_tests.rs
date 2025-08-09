@@ -1,7 +1,7 @@
 //! Unit tests for the storage module.
 
-use zkp_dataset_ledger::storage::{MemoryStorage, Storage, StorageStats, Transaction};
 use zkp_dataset_ledger::error::LedgerError;
+use zkp_dataset_ledger::storage::{MemoryStorage, Storage, StorageStats, Transaction};
 
 /// Test basic memory storage operations.
 #[test]
@@ -17,7 +17,10 @@ fn test_memory_storage_basic() {
 
     // Test update
     storage.put("key1", b"updated_value").unwrap();
-    assert_eq!(storage.get("key1").unwrap(), Some(b"updated_value".to_vec()));
+    assert_eq!(
+        storage.get("key1").unwrap(),
+        Some(b"updated_value".to_vec())
+    );
 
     // Test delete
     storage.delete("key1").unwrap();
@@ -155,18 +158,18 @@ fn test_storage_edge_cases() {
 #[test]
 fn test_storage_transaction() {
     let mut storage = MemoryStorage::new();
-    
+
     // Pre-populate some data
     storage.put("existing", b"data").unwrap();
 
     {
         let mut tx = Transaction::new(&mut storage);
-        
+
         // Add operations to transaction
         tx.put("key1", b"value1").unwrap();
         tx.put("key2", b"value2").unwrap();
         tx.delete("existing").unwrap();
-        
+
         // Commit transaction
         tx.commit().unwrap();
     }
@@ -181,17 +184,17 @@ fn test_storage_transaction() {
 #[test]
 fn test_storage_transaction_rollback() {
     let mut storage = MemoryStorage::new();
-    
+
     // Pre-populate some data
     storage.put("existing", b"data").unwrap();
 
     {
         let mut tx = Transaction::new(&mut storage);
-        
+
         // Add operations to transaction
         tx.put("key1", b"value1").unwrap();
         tx.delete("existing").unwrap();
-        
+
         // Don't commit - transaction should rollback
     } // Transaction drops here without commit
 
@@ -209,7 +212,7 @@ fn test_unicode_storage() {
     let unicode_value = "🌟value_测试_قيمة";
 
     storage.put(unicode_key, unicode_value.as_bytes()).unwrap();
-    
+
     let retrieved = storage.get(unicode_key).unwrap();
     assert_eq!(retrieved, Some(unicode_value.as_bytes().to_vec()));
 
@@ -225,12 +228,12 @@ fn test_create_storage() {
 
     // Test memory storage creation
     let storage = create_storage("memory", "").unwrap();
-    
+
     // Verify it's working by doing a basic operation
-    // Note: We can't test the actual operations because create_storage 
+    // Note: We can't test the actual operations because create_storage
     // returns a boxed trait object and we'd need mutable access
     assert!(storage.stats().is_ok());
-    
+
     // Test invalid backend
     let result = create_storage("invalid_backend", "");
     assert!(result.is_err());

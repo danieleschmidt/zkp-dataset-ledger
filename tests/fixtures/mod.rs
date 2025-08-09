@@ -1,7 +1,7 @@
 // Test fixtures and utilities for ZKP Dataset Ledger
-use std::path::{Path, PathBuf};
-use tempfile::{TempDir, NamedTempFile};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
+use tempfile::{NamedTempFile, TempDir};
 
 /// Test dataset generator for creating sample data
 pub struct TestDataGenerator {
@@ -36,18 +36,22 @@ impl TestDataGenerator {
     pub fn create_medium_csv(&self, name: &str, rows: usize) -> PathBuf {
         let path = self.temp_dir.path().join(format!("{}.csv", name));
         let mut content = String::from("id,feature_1,feature_2,category,target\n");
-        
+
         for i in 1..=rows {
             content.push_str(&format!(
                 "{},{:.3},{:.3},{},{}\n",
                 i,
                 (i as f64 * 0.1).sin(),
                 (i as f64 * 0.2).cos(),
-                match i % 3 { 0 => "A", 1 => "B", _ => "C" },
+                match i % 3 {
+                    0 => "A",
+                    1 => "B",
+                    _ => "C",
+                },
                 i % 2
             ));
         }
-        
+
         std::fs::write(&path, content).expect("Failed to write test CSV");
         path
     }
@@ -165,13 +169,19 @@ impl TestLedger {
     pub fn new() -> Self {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let ledger_path = temp_dir.path().join("test_ledger");
-        Self { temp_dir, ledger_path }
+        Self {
+            temp_dir,
+            ledger_path,
+        }
     }
 
     pub fn with_name(name: &str) -> Self {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let ledger_path = temp_dir.path().join(name);
-        Self { temp_dir, ledger_path }
+        Self {
+            temp_dir,
+            ledger_path,
+        }
     }
 
     pub fn path(&self) -> &Path {
@@ -208,7 +218,9 @@ impl PerformanceTester {
         assert!(
             elapsed <= max_ms,
             "{} took {}ms, expected under {}ms",
-            operation, elapsed, max_ms
+            operation,
+            elapsed,
+            max_ms
         );
     }
 
@@ -217,7 +229,9 @@ impl PerformanceTester {
         assert!(
             elapsed <= max_secs,
             "{} took {:.2}s, expected under {:.2}s",
-            operation, elapsed, max_secs
+            operation,
+            elapsed,
+            max_secs
         );
     }
 }
@@ -227,11 +241,11 @@ pub mod constants {
     pub const SMALL_DATASET_ROWS: usize = 100;
     pub const MEDIUM_DATASET_ROWS: usize = 10_000;
     pub const LARGE_DATASET_ROWS: usize = 100_000;
-    
+
     pub const MAX_PROOF_TIME_MS: u128 = 5_000;
     pub const MAX_VERIFICATION_TIME_MS: u128 = 100;
     pub const MAX_LEDGER_INIT_TIME_MS: u128 = 1_000;
-    
+
     pub const TEST_PROOF_TIMEOUT_SECS: u64 = 30;
     pub const TEST_LEDGER_MAX_SIZE_MB: usize = 100;
 }
@@ -251,11 +265,17 @@ pub mod assertions {
         expected_cols: usize,
     ) {
         assert_eq!(dataset.row_count(), expected_rows, "Row count mismatch");
-        assert_eq!(dataset.column_count(), expected_cols, "Column count mismatch");
+        assert_eq!(
+            dataset.column_count(),
+            expected_cols,
+            "Column count mismatch"
+        );
     }
 
     pub fn assert_ledger_integrity(ledger: &zkp_dataset_ledger::Ledger) {
-        assert!(ledger.verify_chain_integrity().expect("Chain integrity check failed"));
+        assert!(ledger
+            .verify_chain_integrity()
+            .expect("Chain integrity check failed"));
     }
 }
 
@@ -267,7 +287,7 @@ mod tests {
     fn test_data_generator_creates_valid_csv() {
         let generator = TestDataGenerator::new();
         let csv_path = generator.create_small_csv("test");
-        
+
         assert!(csv_path.exists());
         let content = std::fs::read_to_string(&csv_path).unwrap();
         assert!(content.contains("id,feature_1"));

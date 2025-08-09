@@ -20,54 +20,52 @@ fn test_complete_ml_pipeline_workflow() {
     for i in 1..=100 {
         writeln!(temp_file, "{},{},{}", i, i * 2, i % 2).unwrap();
     }
-    
+
     let temp_path = temp_file.path().with_extension("csv");
     std::fs::copy(temp_file.path(), &temp_path).unwrap();
 
     let original_dataset = Dataset::from_path(&temp_path).unwrap();
-    let proof1 = ledger.notarize_dataset(
-        original_dataset.clone(), 
-        "raw-data-v1", 
-        ProofConfig::default()
-    ).unwrap();
-    
+    let proof1 = ledger
+        .notarize_dataset(
+            original_dataset.clone(),
+            "raw-data-v1",
+            ProofConfig::default(),
+        )
+        .unwrap();
+
     assert!(proof1.verify().unwrap());
     assert_eq!(proof1.dataset_hash, original_dataset.compute_hash());
 
     // Step 2: Record preprocessing transformation
-    let preprocessing_proof = zkp_dataset_ledger::proof::Proof::generate(
-        &original_dataset, 
-        &ProofConfig::default()
-    ).unwrap();
-    
+    let preprocessing_proof =
+        zkp_dataset_ledger::proof::Proof::generate(&original_dataset, &ProofConfig::default())
+            .unwrap();
+
     let mut params = std::collections::HashMap::new();
     params.insert("method".to_string(), "standardization".to_string());
     params.insert("features".to_string(), "feature1,feature2".to_string());
-    
-    let transform_id = ledger.record_transformation(
-        "raw-data-v1",
-        "preprocessed-data-v1", 
-        "standardize_features",
-        params,
-        preprocessing_proof
-    ).unwrap();
-    
+
+    let transform_id = ledger
+        .record_transformation(
+            "raw-data-v1",
+            "preprocessed-data-v1",
+            "standardize_features",
+            params,
+            preprocessing_proof,
+        )
+        .unwrap();
+
     assert!(!transform_id.is_empty());
 
     // Step 3: Record train/test split
-    let split_proof = zkp_dataset_ledger::proof::Proof::generate(
-        &original_dataset, 
-        &ProofConfig::default()
-    ).unwrap();
-    
-    let split_id = ledger.record_split(
-        "preprocessed-data-v1",
-        0.8,
-        Some(42),
-        None,
-        split_proof
-    ).unwrap();
-    
+    let split_proof =
+        zkp_dataset_ledger::proof::Proof::generate(&original_dataset, &ProofConfig::default())
+            .unwrap();
+
+    let split_id = ledger
+        .record_split("preprocessed-data-v1", 0.8, Some(42), None, split_proof)
+        .unwrap();
+
     assert!(!split_id.is_empty());
 
     // Step 4: Verify complete chain integrity
@@ -80,7 +78,10 @@ fn test_complete_ml_pipeline_workflow() {
 
     let summary = ledger.get_summary().unwrap();
     assert_eq!(summary.total_entries, 3, "Should have 3 total entries");
-    assert_eq!(summary.datasets_tracked, 2, "Should track 2 unique datasets");
+    assert_eq!(
+        summary.datasets_tracked, 2,
+        "Should track 2 unique datasets"
+    );
     assert!(summary.operations_by_type.contains_key("notarize"));
     assert!(summary.operations_by_type.contains_key("transform"));
     assert!(summary.operations_by_type.contains_key("split"));
@@ -104,7 +105,7 @@ fn test_proof_verification_workflow() {
     std::fs::copy(temp_file.path(), &temp_path).unwrap();
 
     let dataset = Dataset::from_path(&temp_path).unwrap();
-    
+
     // Test different proof types
     let proof_types = vec![
         zkp_dataset_ledger::proof::ProofType::DatasetIntegrity,
@@ -119,14 +120,19 @@ fn test_proof_verification_workflow() {
             ..ProofConfig::default()
         };
 
-        let proof = ledger.notarize_dataset(dataset.clone(), 
-            &format!("dataset-{:?}", proof_type), config).unwrap();
-        
+        let proof = ledger
+            .notarize_dataset(
+                dataset.clone(),
+                &format!("dataset-{:?}", proof_type),
+                config,
+            )
+            .unwrap();
+
         // Verify proof
         assert!(proof.verify().unwrap(), "Proof should be valid");
         assert_eq!(proof.proof_type, proof_type);
         assert!(proof.merkle_proof.is_some(), "Should have Merkle proof");
-        
+
         // Test JSON serialization/deserialization
         let proof_json = proof.to_json().unwrap();
         let deserialized_proof = zkp_dataset_ledger::proof::Proof::from_json(&proof_json).unwrap();
@@ -158,12 +164,10 @@ fn test_multiple_datasets_tracking() {
         std::fs::copy(temp_file.path(), &temp_path).unwrap();
         dataset_paths.push(temp_path);
 
-        let dataset = Dataset::from_path(&dataset_paths[i-1]).unwrap();
-        let _proof = ledger.notarize_dataset(
-            dataset, 
-            &format!("dataset-{}", i), 
-            ProofConfig::default()
-        ).unwrap();
+        let dataset = Dataset::from_path(&dataset_paths[i - 1]).unwrap();
+        let _proof = ledger
+            .notarize_dataset(dataset, &format!("dataset-{}", i), ProofConfig::default())
+            .unwrap();
     }
 
     // Verify we're tracking all datasets
@@ -173,7 +177,9 @@ fn test_multiple_datasets_tracking() {
 
     // Test querying specific datasets
     for i in 1..=5 {
-        let history = ledger.get_dataset_history(&format!("dataset-{}", i)).unwrap();
+        let history = ledger
+            .get_dataset_history(&format!("dataset-{}", i))
+            .unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].dataset_name, format!("dataset-{}", i));
     }
@@ -182,7 +188,7 @@ fn test_multiple_datasets_tracking() {
     let query = zkp_dataset_ledger::ledger::LedgerQuery::default();
     let export_json = ledger.export_to_json(&query).unwrap();
     assert!(!export_json.is_empty());
-    
+
     // Verify JSON contains all datasets
     for i in 1..=5 {
         assert!(export_json.contains(&format!("dataset-{}", i)));
@@ -198,7 +204,7 @@ fn test_multiple_datasets_tracking() {
 fn test_ledger_persistence_and_recovery() {
     // This test would verify that ledger state can be persisted and recovered
     // For now, testing in-memory behavior
-    
+
     let ledger_name = "persistence-test";
     let mut ledger = Ledger::new(ledger_name).unwrap();
 
@@ -211,7 +217,9 @@ fn test_ledger_persistence_and_recovery() {
     std::fs::copy(temp_file.path(), &temp_path).unwrap();
 
     let dataset = Dataset::from_path(&temp_path).unwrap();
-    let _proof = ledger.notarize_dataset(dataset, "test-dataset", ProofConfig::default()).unwrap();
+    let _proof = ledger
+        .notarize_dataset(dataset, "test-dataset", ProofConfig::default())
+        .unwrap();
 
     // Verify ledger state
     let summary = ledger.get_summary().unwrap();

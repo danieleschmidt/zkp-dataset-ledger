@@ -197,7 +197,7 @@ impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LedgerError> {
         let contents = fs::read_to_string(path)
             .map_err(|e| LedgerError::ConfigError(format!("Failed to read config file: {}", e)))?;
-        
+
         Self::from_toml(&contents)
     }
 
@@ -211,7 +211,7 @@ impl Config {
     pub fn from_json_file<P: AsRef<Path>>(path: P) -> Result<Self, LedgerError> {
         let contents = fs::read_to_string(path)
             .map_err(|e| LedgerError::ConfigError(format!("Failed to read config file: {}", e)))?;
-        
+
         Self::from_json(&contents)
     }
 
@@ -235,24 +235,28 @@ impl Config {
 
         // Crypto configuration
         if let Ok(use_groth16) = std::env::var("ZKP_USE_GROTH16") {
-            config.crypto.use_groth16 = use_groth16.parse()
+            config.crypto.use_groth16 = use_groth16
+                .parse()
                 .map_err(|e| LedgerError::ConfigError(format!("Invalid ZKP_USE_GROTH16: {}", e)))?;
         }
 
         // Performance configuration
         if let Ok(parallel) = std::env::var("ZKP_PARALLEL_PROOFS") {
-            config.performance.parallel_proof_generation = parallel.parse()
-                .map_err(|e| LedgerError::ConfigError(format!("Invalid ZKP_PARALLEL_PROOFS: {}", e)))?;
+            config.performance.parallel_proof_generation = parallel.parse().map_err(|e| {
+                LedgerError::ConfigError(format!("Invalid ZKP_PARALLEL_PROOFS: {}", e))
+            })?;
         }
         if let Ok(batch_size) = std::env::var("ZKP_BATCH_SIZE") {
-            config.performance.batch_size = batch_size.parse()
+            config.performance.batch_size = batch_size
+                .parse()
                 .map_err(|e| LedgerError::ConfigError(format!("Invalid ZKP_BATCH_SIZE: {}", e)))?;
         }
 
         // Security configuration
         if let Ok(access_control) = std::env::var("ZKP_ACCESS_CONTROL") {
-            config.security.enable_access_control = access_control.parse()
-                .map_err(|e| LedgerError::ConfigError(format!("Invalid ZKP_ACCESS_CONTROL: {}", e)))?;
+            config.security.enable_access_control = access_control.parse().map_err(|e| {
+                LedgerError::ConfigError(format!("Invalid ZKP_ACCESS_CONTROL: {}", e))
+            })?;
         }
 
         // Monitoring configuration
@@ -288,37 +292,43 @@ impl Config {
     pub fn validate(&self) -> Result<(), LedgerError> {
         // Validate storage backend
         match self.storage.backend.as_str() {
-            "memory" | "rocksdb" | "postgres" => {},
-            _ => return Err(LedgerError::ConfigError(
-                format!("Unsupported storage backend: {}", self.storage.backend)
-            )),
+            "memory" | "rocksdb" | "postgres" => {}
+            _ => {
+                return Err(LedgerError::ConfigError(format!(
+                    "Unsupported storage backend: {}",
+                    self.storage.backend
+                )))
+            }
         }
 
         // Validate performance settings
         if self.performance.max_concurrent_operations == 0 {
             return Err(LedgerError::ConfigError(
-                "max_concurrent_operations must be greater than 0".to_string()
+                "max_concurrent_operations must be greater than 0".to_string(),
             ));
         }
 
         if self.performance.batch_size == 0 {
             return Err(LedgerError::ConfigError(
-                "batch_size must be greater than 0".to_string()
+                "batch_size must be greater than 0".to_string(),
             ));
         }
 
         // Validate crypto settings
         if self.crypto.merkle_tree_depth == 0 || self.crypto.merkle_tree_depth > 64 {
             return Err(LedgerError::ConfigError(
-                "merkle_tree_depth must be between 1 and 64".to_string()
+                "merkle_tree_depth must be between 1 and 64".to_string(),
             ));
         }
 
         // Validate monitoring settings
-        if !["trace", "debug", "info", "warn", "error"].contains(&self.monitoring.log_level.as_str()) {
-            return Err(LedgerError::ConfigError(
-                format!("Invalid log level: {}", self.monitoring.log_level)
-            ));
+        if !["trace", "debug", "info", "warn", "error"]
+            .contains(&self.monitoring.log_level.as_str())
+        {
+            return Err(LedgerError::ConfigError(format!(
+                "Invalid log level: {}",
+                self.monitoring.log_level
+            )));
         }
 
         Ok(())
@@ -352,7 +362,8 @@ impl Config {
     /// Generate example configuration file content.
     pub fn example_toml() -> String {
         let config = Config::default();
-        toml::to_string_pretty(&config).unwrap_or_else(|_| String::from("# Failed to generate example"))
+        toml::to_string_pretty(&config)
+            .unwrap_or_else(|_| String::from("# Failed to generate example"))
     }
 
     /// Generate example configuration as JSON.
@@ -424,8 +435,8 @@ impl Default for ConfigBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_default_config() {

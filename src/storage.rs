@@ -113,7 +113,7 @@ pub mod rocksdb_backend {
             let mut opts = Options::default();
             opts.create_if_missing(true);
             opts.set_compression_type(rocksdb::DBCompressionType::Zstd);
-            
+
             // Performance optimizations
             opts.set_max_background_jobs(6);
             opts.set_write_buffer_size(128 * 1024 * 1024); // 128MB
@@ -121,7 +121,7 @@ pub mod rocksdb_backend {
             opts.set_level_zero_file_num_compaction_trigger(4);
             opts.set_level_zero_slowdown_writes_trigger(20);
             opts.set_level_zero_stop_writes_trigger(36);
-            
+
             // Enable bloom filters for faster reads
             let mut block_opts = rocksdb::BlockBasedOptions::default();
             block_opts.set_bloom_filter(10.0, false);
@@ -146,7 +146,9 @@ pub mod rocksdb_backend {
 
         /// Get database statistics
         pub fn get_property(&self, property: &str) -> Result<Option<String>, LedgerError> {
-            Ok(self.db.property_value(property)
+            Ok(self
+                .db
+                .property_value(property)
                 .map_err(|e| LedgerError::StorageError(format!("Property query failed: {}", e)))?)
         }
     }
@@ -173,7 +175,7 @@ pub mod rocksdb_backend {
         fn list_keys(&self, prefix: &str) -> Result<Vec<String>, LedgerError> {
             let mut keys = Vec::new();
             let iter = self.db.prefix_iterator(prefix.as_bytes());
-            
+
             for item in iter {
                 match item {
                     Ok((key, _)) => {
@@ -186,9 +188,7 @@ pub mod rocksdb_backend {
                         }
                     }
                     Err(e) => {
-                        return Err(LedgerError::StorageError(format!(
-                            "Iterator error: {}", e
-                        )));
+                        return Err(LedgerError::StorageError(format!("Iterator error: {}", e)));
                     }
                 }
             }
@@ -205,12 +205,14 @@ pub mod rocksdb_backend {
 
         fn stats(&self) -> Result<StorageStats, LedgerError> {
             // Get approximate key count
-            let num_keys = self.get_property("rocksdb.estimate-num-keys")?
+            let num_keys = self
+                .get_property("rocksdb.estimate-num-keys")?
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or(0);
 
             // Get approximate size
-            let size_bytes = self.get_property("rocksdb.total-sst-files-size")?
+            let size_bytes = self
+                .get_property("rocksdb.total-sst-files-size")?
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(0);
 

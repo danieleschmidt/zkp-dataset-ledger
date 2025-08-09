@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use zkp_dataset_ledger::storage::create_storage;
 use zkp_dataset_ledger::{Config, ConfigBuilder, Dataset, Ledger, ProofConfig, Result};
-use zkp_dataset_ledger::storage::{create_storage};
 
 #[derive(Parser)]
 #[command(name = "zkp-ledger")]
@@ -275,9 +275,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .init();
+    tracing_subscriber::fmt().with_max_level(log_level).init();
 
     match cli.command {
         Commands::Init {
@@ -292,10 +290,14 @@ async fn main() -> Result<()> {
 
             // Create storage backend using configuration
             let (backend_type, connection_string) = config.get_storage_config();
-            let actual_storage = if storage != "memory" { &storage } else { backend_type };
+            let actual_storage = if storage != "memory" {
+                &storage
+            } else {
+                backend_type
+            };
             let storage_backend = create_storage(actual_storage, connection_string)?;
             let _ledger = Ledger::new(storage_backend);
-            
+
             println!(
                 "✅ Successfully initialized ledger for project: {} with {} storage",
                 project, actual_storage
@@ -622,7 +624,7 @@ fn load_config(config_path: Option<&str>) -> Result<Config> {
                     };
                 }
             }
-            
+
             // Fall back to environment variables and defaults
             Config::from_env()
         }
@@ -641,15 +643,21 @@ async fn handle_config_command(command: ConfigCommands, _current_config: &Config
             });
 
             let config = Config::default();
-            
+
             match format.as_str() {
                 "json" => {
                     config.save_json(&output_path)?;
-                    println!("✅ Generated JSON configuration file: {}", output_path.display());
+                    println!(
+                        "✅ Generated JSON configuration file: {}",
+                        output_path.display()
+                    );
                 }
                 _ => {
                     config.save_toml(&output_path)?;
-                    println!("✅ Generated TOML configuration file: {}", output_path.display());
+                    println!(
+                        "✅ Generated TOML configuration file: {}",
+                        output_path.display()
+                    );
                 }
             }
 
@@ -691,7 +699,7 @@ async fn handle_config_command(command: ConfigCommands, _current_config: &Config
 
         ConfigCommands::Set { key, value, file } => {
             let file_path = file.unwrap_or_else(|| PathBuf::from("zkp-ledger.toml"));
-            
+
             let mut config = if file_path.exists() {
                 if file_path.extension().map_or(false, |ext| ext == "json") {
                     Config::from_json_file(&file_path)?
@@ -708,7 +716,9 @@ async fn handle_config_command(command: ConfigCommands, _current_config: &Config
                 "storage.connection_string" => config.storage.connection_string = value,
                 "crypto.use_groth16" => {
                     config.crypto.use_groth16 = value.parse().map_err(|_| {
-                        zkp_dataset_ledger::LedgerError::ConfigError("Invalid boolean value".to_string())
+                        zkp_dataset_ledger::LedgerError::ConfigError(
+                            "Invalid boolean value".to_string(),
+                        )
                     })?;
                 }
                 "monitoring.log_level" => config.monitoring.log_level = value,

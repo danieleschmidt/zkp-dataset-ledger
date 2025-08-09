@@ -11,7 +11,10 @@ pub mod recovery;
 pub mod security;
 pub mod storage;
 
-pub use config::{Config, ConfigBuilder, StorageConfig, CryptoConfig, PerformanceConfig as ConfigPerformanceConfig};
+pub use config::{
+    Config, ConfigBuilder, CryptoConfig, PerformanceConfig as ConfigPerformanceConfig,
+    StorageConfig,
+};
 pub use dataset::Dataset;
 pub use error::LedgerError;
 pub use ledger::Ledger;
