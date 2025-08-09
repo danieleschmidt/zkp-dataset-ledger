@@ -2,8 +2,8 @@
 
 use std::io::Write;
 use tempfile::NamedTempFile;
-use zkp_dataset_ledger::{Dataset, Result};
 use zkp_dataset_ledger::proof::{Proof, ProofConfig, ProofType};
+use zkp_dataset_ledger::{Dataset, Result};
 
 /// Test basic proof generation and verification.
 #[test]
@@ -28,13 +28,13 @@ fn test_proof_generation_basic() -> Result<()> {
     assert!(!proof.proof_data.is_empty());
     assert_eq!(proof.proof_type, ProofType::DatasetIntegrity);
     assert!(!proof.public_inputs.is_empty());
-    
+
     // Verify the proof
     assert!(proof.verify()?);
 
     // Clean up
     std::fs::remove_file(temp_path).ok();
-    
+
     Ok(())
 }
 

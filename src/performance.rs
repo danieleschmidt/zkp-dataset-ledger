@@ -323,7 +323,7 @@ where
         // Wait for connection to become available
         // In a real implementation, we'd use a proper waiting mechanism
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         // Use Box::pin to avoid infinite recursion in async fn
         Box::pin(self.get_connection()).await
     }

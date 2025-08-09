@@ -2,9 +2,9 @@
 
 use std::io::Write;
 use tempfile::NamedTempFile;
-use zkp_dataset_ledger::{Dataset, Ledger, Result};
 use zkp_dataset_ledger::proof::{Proof, ProofConfig, ProofType};
 use zkp_dataset_ledger::storage::MemoryStorage;
+use zkp_dataset_ledger::{Dataset, Ledger, Result};
 
 /// Test complete workflow from dataset to ledger entry.
 #[test]
@@ -59,7 +59,7 @@ fn test_complete_workflow() -> Result<()> {
     // Step 8: Export and import test
     let ledger_json = ledger.export_json()?;
     let imported_ledger = Ledger::import_json(&ledger_json, Box::new(MemoryStorage::new()))?;
-    
+
     assert!(imported_ledger.verify_chain()?);
     let imported_entry = imported_ledger.get_entry(&entry_id)?.unwrap();
     assert_eq!(imported_entry.dataset_hash, entry.dataset_hash);
@@ -86,7 +86,7 @@ fn test_multi_dataset_workflow() -> Result<()> {
     for (name, csv_content) in datasets_data {
         // Create dataset
         let dataset = Dataset::from_csv_string(csv_content)?;
-        
+
         // Choose different proof types for variety
         let proof_type = match name {
             "users" => ProofType::DatasetIntegrity,
@@ -133,7 +133,7 @@ fn test_multi_dataset_workflow() -> Result<()> {
 fn test_storage_backend_workflow() -> Result<()> {
     // Test with memory storage
     let dataset = Dataset::from_csv_string("a,b\n1,2\n3,4")?;
-    
+
     let proof_config = ProofConfig {
         use_groth16: false, // Use legacy proofs for faster testing
         ..ProofConfig::default()
@@ -143,10 +143,10 @@ fn test_storage_backend_workflow() -> Result<()> {
     // Test memory storage
     let memory_storage = Box::new(MemoryStorage::new());
     let mut memory_ledger = Ledger::new(memory_storage);
-    
+
     let entry_id = memory_ledger.add_dataset_entry(dataset.clone(), proof.clone())?;
     assert!(memory_ledger.verify_chain()?);
-    
+
     let entry = memory_ledger.get_entry(&entry_id)?.unwrap();
     assert_eq!(entry.dataset_hash, dataset.compute_hash());
 
@@ -188,17 +188,17 @@ fn test_concurrent_operations() -> Result<()> {
 
     // Simulate multiple operations
     let mut entry_ids = Vec::new();
-    
+
     for i in 0..10 {
         let csv_data = format!("id,value\n{},{}", i, i * 10);
         let dataset = Dataset::from_csv_string(&csv_data)?;
-        
+
         let proof_config = ProofConfig {
             use_groth16: false,
             ..ProofConfig::default()
         };
         let proof = Proof::generate(&dataset, &proof_config)?;
-        
+
         let entry_id = ledger.add_dataset_entry(dataset, proof)?;
         entry_ids.push(entry_id);
     }
@@ -220,11 +220,7 @@ fn test_batch_workflow() -> Result<()> {
     use zkp_dataset_ledger::proof::BatchProofGenerator;
 
     // Create multiple datasets
-    let csv_data_sets = vec![
-        "a,b\n1,2",
-        "x,y\n3,4", 
-        "p,q\n5,6",
-    ];
+    let csv_data_sets = vec!["a,b\n1,2", "x,y\n3,4", "p,q\n5,6"];
 
     let mut datasets = Vec::new();
     for csv_data in csv_data_sets {
