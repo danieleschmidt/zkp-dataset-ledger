@@ -1,0 +1,312 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zkp-ledger-primary
+  namespace: zkp-ledger
+  labels:
+    app: zkp-ledger
+    role: primary
+    version: "1.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: zkp-ledger
+      role: primary
+  template:
+    metadata:
+      labels:
+        app: zkp-ledger
+        role: primary
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: zkp-ledger
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: zkp-ledger
+        image: zkp-dataset-ledger:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: ZKP_LEDGER_NODE_ROLE
+          value: "primary"
+        - name: ZKP_LEDGER_CLUSTER_ID
+          value: "prod-cluster-k8s"
+        - name: ZKP_LEDGER_NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ZKP_LEDGER_BIND_ADDRESS
+          value: "0.0.0.0:8080"
+        - name: ZKP_LEDGER_DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: zkp-ledger-secrets
+              key: database-url
+        - name: ZKP_LEDGER_REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: ZKP_LEDGER_PROMETHEUS_PORT
+          value: "9090"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: zkp-ledger-secrets
+              key: jwt-secret
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.toml
+          subPath: production.toml
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: backups
+          mountPath: /app/backups
+        - name: certs
+          mountPath: /app/certs
+          readOnly: true
+        - name: tmp
+          mountPath: /app/tmp
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: zkp-ledger-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: zkp-ledger-data
+      - name: backups
+        persistentVolumeClaim:
+          claimName: zkp-ledger-backups
+      - name: certs
+        secret:
+          secretName: zkp-ledger-tls
+      - name: tmp
+        emptyDir: {}
+      nodeSelector:
+        node-role: zkp-primary
+      tolerations:
+      - key: "zkp-ledger"
+        operator: "Equal"
+        value: "primary"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - zkp-ledger
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zkp-ledger-secondary
+  namespace: zkp-ledger
+  labels:
+    app: zkp-ledger
+    role: secondary
+    version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: zkp-ledger
+      role: secondary
+  template:
+    metadata:
+      labels:
+        app: zkp-ledger
+        role: secondary
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: zkp-ledger
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: zkp-ledger
+        image: zkp-dataset-ledger:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: ZKP_LEDGER_NODE_ROLE
+          value: "secondary"
+        - name: ZKP_LEDGER_CLUSTER_ID
+          value: "prod-cluster-k8s"
+        - name: ZKP_LEDGER_NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ZKP_LEDGER_BIND_ADDRESS
+          value: "0.0.0.0:8080"
+        - name: ZKP_LEDGER_PRIMARY_NODE
+          value: "zkp-ledger-primary-service:8080"
+        - name: ZKP_LEDGER_DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: zkp-ledger-secrets
+              key: database-url
+        - name: ZKP_LEDGER_REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: ZKP_LEDGER_PROMETHEUS_PORT
+          value: "9090"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: zkp-ledger-secrets
+              key: jwt-secret
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.toml
+          subPath: production.toml
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: certs
+          mountPath: /app/certs
+          readOnly: true
+        - name: tmp
+          mountPath: /app/tmp
+        resources:
+          requests:
+            memory: "1.5Gi"
+            cpu: "500m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "3Gi"
+            cpu: "1500m"
+            ephemeral-storage: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: zkp-ledger-config
+      - name: data
+        emptyDir: {}
+      - name: certs
+        secret:
+          secretName: zkp-ledger-tls
+      - name: tmp
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - zkp-ledger
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role
+                operator: In
+                values:
+                - zkp-secondary

@@ -1,0 +1,410 @@
+version: '3.8'
+
+services:
+  zkp-ledger-primary:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      args:
+        RUST_VERSION: 1.88-slim
+    container_name: zkp-ledger-primary
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ZKP_LEDGER_NODE_ROLE=primary
+      - ZKP_LEDGER_CLUSTER_ID=prod-cluster-001
+      - ZKP_LEDGER_NODE_ID=primary-001
+      - ZKP_LEDGER_BIND_ADDRESS=0.0.0.0:8080
+      - ZKP_LEDGER_CLUSTER_PEERS=zkp-ledger-secondary-1:8081,zkp-ledger-secondary-2:8082
+      - ZKP_LEDGER_DB_URL=postgresql://zkp_user:${DB_PASSWORD}@postgres-primary:5432/zkp_ledger
+      - ZKP_LEDGER_REDIS_URL=redis://redis-cluster:6379
+      - ZKP_LEDGER_BACKUP_ENABLED=true
+      - ZKP_LEDGER_BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+      - ZKP_LEDGER_BACKUP_RETENTION_DAYS=30
+      - ZKP_LEDGER_METRICS_ENABLED=true
+      - ZKP_LEDGER_PROMETHEUS_PORT=9090
+      - ZKP_LEDGER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    ports:
+      - "8080:8080"
+      - "9090:9090"  # Prometheus metrics
+    volumes:
+      - zkp_data_primary:/app/data
+      - zkp_backups:/app/backups
+      - ./config/production.toml:/app/config.toml:ro
+      - ./certs:/app/certs:ro
+    networks:
+      - zkp-cluster
+      - monitoring
+    depends_on:
+      - postgres-primary
+      - redis-cluster
+    healthcheck:
+      test: ["CMD", "/app/zkp-ledger", "health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/tmp
+
+  zkp-ledger-secondary-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: zkp-ledger-secondary-1
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ZKP_LEDGER_NODE_ROLE=secondary
+      - ZKP_LEDGER_CLUSTER_ID=prod-cluster-001
+      - ZKP_LEDGER_NODE_ID=secondary-001
+      - ZKP_LEDGER_BIND_ADDRESS=0.0.0.0:8081
+      - ZKP_LEDGER_PRIMARY_NODE=zkp-ledger-primary:8080
+      - ZKP_LEDGER_CLUSTER_PEERS=zkp-ledger-primary:8080,zkp-ledger-secondary-2:8082
+      - ZKP_LEDGER_DB_URL=postgresql://zkp_user:${DB_PASSWORD}@postgres-secondary:5432/zkp_ledger
+      - ZKP_LEDGER_REDIS_URL=redis://redis-cluster:6379
+      - ZKP_LEDGER_METRICS_ENABLED=true
+      - ZKP_LEDGER_PROMETHEUS_PORT=9091
+    ports:
+      - "8081:8081"
+      - "9091:9091"
+    volumes:
+      - zkp_data_secondary_1:/app/data
+      - ./config/production.toml:/app/config.toml:ro
+      - ./certs:/app/certs:ro
+    networks:
+      - zkp-cluster
+      - monitoring
+    depends_on:
+      - postgres-secondary
+      - redis-cluster
+    healthcheck:
+      test: ["CMD", "/app/zkp-ledger", "health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '1.5'
+        reservations:
+          memory: 1.5G
+          cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/tmp
+
+  zkp-ledger-secondary-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: zkp-ledger-secondary-2
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ZKP_LEDGER_NODE_ROLE=secondary
+      - ZKP_LEDGER_CLUSTER_ID=prod-cluster-001
+      - ZKP_LEDGER_NODE_ID=secondary-002
+      - ZKP_LEDGER_BIND_ADDRESS=0.0.0.0:8082
+      - ZKP_LEDGER_PRIMARY_NODE=zkp-ledger-primary:8080
+      - ZKP_LEDGER_CLUSTER_PEERS=zkp-ledger-primary:8080,zkp-ledger-secondary-1:8081
+      - ZKP_LEDGER_DB_URL=postgresql://zkp_user:${DB_PASSWORD}@postgres-secondary:5432/zkp_ledger
+      - ZKP_LEDGER_REDIS_URL=redis://redis-cluster:6379
+      - ZKP_LEDGER_METRICS_ENABLED=true
+      - ZKP_LEDGER_PROMETHEUS_PORT=9092
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    volumes:
+      - zkp_data_secondary_2:/app/data
+      - ./config/production.toml:/app/config.toml:ro
+      - ./certs:/app/certs:ro
+    networks:
+      - zkp-cluster
+      - monitoring
+    depends_on:
+      - postgres-secondary
+      - redis-cluster
+    healthcheck:
+      test: ["CMD", "/app/zkp-ledger", "health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '1.5'
+        reservations:
+          memory: 1.5G
+          cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/tmp
+
+  # Database cluster
+  postgres-primary:
+    image: postgres:16-alpine
+    container_name: postgres-primary
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=zkp_ledger
+      - POSTGRES_USER=zkp_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--data-checksums
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./db/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - zkp-cluster
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zkp_user -d zkp_ledger"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres-secondary:
+    image: postgres:16-alpine
+    container_name: postgres-secondary
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=zkp_ledger
+      - POSTGRES_USER=zkp_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--data-checksums
+    volumes:
+      - postgres_secondary_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./db/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - zkp-cluster
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zkp_user -d zkp_ledger"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis cluster for caching and coordination
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: redis-cluster
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - zkp-cluster
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Monitoring and observability
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --web.console.templates=/etc/prometheus/consoles
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.2'
+
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - monitoring
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger collector
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # Load balancer
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx-lb
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - zkp-cluster
+      - monitoring
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - zkp-ledger-primary
+      - zkp-ledger-secondary-1
+      - zkp-ledger-secondary-2
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  zkp_data_primary:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/data/primary
+  zkp_data_secondary_1:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/data/secondary-1
+  zkp_data_secondary_2:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/data/secondary-2
+  zkp_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/zkp-ledger/backups
+  postgres_primary_data:
+    driver: local
+  postgres_secondary_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  zkp-cluster:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  monitoring:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
