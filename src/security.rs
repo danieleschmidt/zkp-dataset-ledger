@@ -2,14 +2,15 @@
 
 use crate::{LedgerError, Result};
 use chrono::{DateTime, Utc};
+use regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::io::Read;
+use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-use std::path::Path;
-use std::io::Read;
-use tracing::{debug, info, warn, error};
 
 /// Comprehensive security configuration for the ledger
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,8 +119,14 @@ impl Default for SecurityConfig {
                 headers.insert("X-Frame-Options".to_string(), "DENY".to_string());
                 headers.insert("X-Content-Type-Options".to_string(), "nosniff".to_string());
                 headers.insert("X-XSS-Protection".to_string(), "1; mode=block".to_string());
-                headers.insert("Strict-Transport-Security".to_string(), "max-age=31536000; includeSubDomains".to_string());
-                headers.insert("Content-Security-Policy".to_string(), "default-src 'self'".to_string());
+                headers.insert(
+                    "Strict-Transport-Security".to_string(),
+                    "max-age=31536000; includeSubDomains".to_string(),
+                );
+                headers.insert(
+                    "Content-Security-Policy".to_string(),
+                    "default-src 'self'".to_string(),
+                );
                 headers
             },
             enable_encryption_at_rest: true,

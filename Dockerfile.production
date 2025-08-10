@@ -1,0 +1,101 @@
+# Multi-stage production Dockerfile for ZKP Dataset Ledger
+ARG RUST_VERSION=1.88-slim
+
+# Build stage
+FROM rust:${RUST_VERSION} as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libclang-dev \
+    clang \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -m -u 1001 appuser
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Copy dependency files
+COPY Cargo.toml Cargo.lock ./
+COPY .cargo .cargo
+
+# Build dependencies (cached layer)
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release --locked && \
+    rm -rf src
+
+# Copy source code
+COPY src/ src/
+COPY benches/ benches/
+COPY tests/ tests/
+COPY examples/ examples/
+
+# Build application
+RUN cargo build --release --locked --bin zkp-ledger-cli
+
+# Verify binary
+RUN ldd target/release/zkp-ledger-cli && \
+    ./target/release/zkp-ledger-cli --version
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove -y \
+    && apt-get autoclean
+
+# Create app user
+RUN useradd -m -u 1001 appuser
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/backups /app/tmp /app/certs && \
+    chown -R appuser:appuser /app
+
+# Copy binary from builder
+COPY --from=builder --chown=appuser:appuser /usr/src/app/target/release/zkp-ledger-cli /app/zkp-ledger
+
+# Make binary executable
+RUN chmod +x /app/zkp-ledger
+
+# Copy configuration templates
+COPY --chown=appuser:appuser config/ /app/config/
+
+# Switch to app user
+USER appuser
+WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ./zkp-ledger health-check || exit 1
+
+# Environment variables
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+ENV ZKP_LEDGER_CONFIG_FILE=/app/config.toml
+ENV ZKP_LEDGER_DATA_DIR=/app/data
+ENV ZKP_LEDGER_BACKUP_DIR=/app/backups
+
+# Expose ports
+EXPOSE 8080 9090
+
+# Entry point
+ENTRYPOINT ["./zkp-ledger"]
+CMD ["server", "--config", "/app/config.toml"]
+
+# Labels
+LABEL org.opencontainers.image.title="ZKP Dataset Ledger"
+LABEL org.opencontainers.image.description="Zero-Knowledge Proof Dataset Ledger for ML Pipeline Auditing"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/terragon-labs/zkp-dataset-ledger"
+LABEL maintainer="Terragon Labs <devops@terragonlabs.com>"

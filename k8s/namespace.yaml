@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zkp-ledger
+  labels:
+    app: zkp-dataset-ledger
+    environment: production
+    version: "1.0.0"
+  annotations:
+    description: "Zero-Knowledge Proof Dataset Ledger production namespace"

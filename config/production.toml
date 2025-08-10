@@ -1,0 +1,222 @@
+# Production Configuration for ZKP Dataset Ledger
+
+[server]
+bind_address = "0.0.0.0:8080"
+max_connections = 1000
+read_timeout_seconds = 30
+write_timeout_seconds = 30
+idle_timeout_seconds = 300
+
+[cluster]
+node_id = "${ZKP_LEDGER_NODE_ID}"
+cluster_id = "${ZKP_LEDGER_CLUSTER_ID}"
+role = "${ZKP_LEDGER_NODE_ROLE}"  # primary, secondary
+peers = "${ZKP_LEDGER_CLUSTER_PEERS}"  # comma-separated list
+election_timeout_ms = 1000
+heartbeat_interval_ms = 250
+consensus_algorithm = "raft"  # raft, pbft
+
+[database]
+url = "${ZKP_LEDGER_DB_URL}"
+max_connections = 50
+min_connections = 5
+connection_timeout_seconds = 30
+idle_timeout_seconds = 600
+statement_cache_size = 1000
+
+[storage]
+backend = "rocksdb"  # rocksdb, postgres
+data_directory = "/app/data"
+block_cache_size_mb = 512
+write_buffer_size_mb = 128
+max_open_files = 1000
+compression = "lz4"
+
+[redis]
+url = "${ZKP_LEDGER_REDIS_URL}"
+pool_size = 20
+connection_timeout_seconds = 5
+command_timeout_seconds = 10
+retry_attempts = 3
+
+[crypto]
+# Groth16 proving system configuration
+circuit_cache_size = 100
+trusted_setup_path = "/app/certs/trusted_setup.json"
+proof_compression = true
+parallel_proving = true
+max_proving_threads = 4
+
+# BLS12-381 curve parameters
+curve = "bls12_381"
+hash_to_curve_suite = "BLS12381G1_XMD:SHA-256_SSWU_RO_"
+
+[security]
+# Authentication and authorization
+enable_auth = true
+jwt_secret = "${JWT_SECRET}"
+jwt_expiration_hours = 24
+bcrypt_cost = 12
+
+# TLS/SSL configuration
+enable_tls = true
+cert_file = "/app/certs/server.crt"
+key_file = "/app/certs/server.key"
+ca_file = "/app/certs/ca.crt"
+
+# Rate limiting
+rate_limit_requests_per_minute = 1000
+rate_limit_burst_size = 100
+
+# Input validation
+max_payload_size_mb = 100
+max_dataset_size_gb = 10
+allowed_file_types = ["csv", "parquet", "json", "jsonl"]
+
+[backup]
+enabled = true
+schedule = "${ZKP_LEDGER_BACKUP_SCHEDULE}"  # cron format
+retention_days = 30
+compression_enabled = true
+encryption_enabled = true
+verification_enabled = true
+incremental_backups = true
+backup_directory = "/app/backups"
+
+# S3-compatible storage for offsite backups
+remote_backup_enabled = true
+remote_backup_endpoint = "${S3_ENDPOINT}"
+remote_backup_bucket = "${S3_BUCKET}"
+remote_backup_access_key = "${S3_ACCESS_KEY}"
+remote_backup_secret_key = "${S3_SECRET_KEY}"
+
+[monitoring]
+enabled = true
+prometheus_port = 9090
+health_check_interval_seconds = 30
+collect_system_metrics = true
+collect_custom_metrics = true
+
+# Structured logging
+log_level = "info"
+log_format = "json"
+log_file = "/app/logs/zkp-ledger.log"
+log_rotation = "daily"
+max_log_files = 30
+
+# Distributed tracing
+tracing_enabled = true
+jaeger_endpoint = "${ZKP_LEDGER_JAEGER_ENDPOINT}"
+trace_sample_rate = 0.1
+
+[performance]
+# Parallel processing
+max_worker_threads = 8
+async_runtime_threads = 4
+blocking_thread_pool_size = 16
+
+# Memory management
+max_memory_usage_mb = 3072
+gc_collection_interval_seconds = 300
+
+# Caching
+proof_cache_size_mb = 256
+merkle_cache_size_mb = 128
+query_cache_size_mb = 64
+cache_ttl_seconds = 3600
+
+# Batch processing
+max_batch_size = 1000
+batch_timeout_ms = 5000
+parallel_batch_processing = true
+
+[distributed]
+# Load balancing
+load_balancer_strategy = "resource_aware"  # round_robin, least_loaded, resource_aware
+health_check_enabled = true
+failover_enabled = true
+auto_scaling_enabled = false
+
+# Work distribution
+work_stealing_enabled = true
+task_queue_size = 10000
+task_timeout_seconds = 300
+
+# Network configuration
+message_compression = true
+message_encryption = true
+max_message_size_mb = 10
+connection_pool_size = 20
+
+[alerting]
+enabled = true
+email_notifications = true
+slack_notifications = false
+webhook_notifications = true
+
+# Alert thresholds
+cpu_usage_threshold = 80.0
+memory_usage_threshold = 85.0
+disk_usage_threshold = 90.0
+error_rate_threshold = 5.0
+response_time_p99_threshold_ms = 5000
+
+# Notification channels
+smtp_server = "${SMTP_SERVER}"
+smtp_port = 587
+smtp_username = "${SMTP_USERNAME}"
+smtp_password = "${SMTP_PASSWORD}"
+alert_email_from = "alerts@terragonlabs.com"
+alert_email_to = ["ops@terragonlabs.com"]
+
+webhook_url = "${ALERT_WEBHOOK_URL}"
+webhook_timeout_seconds = 10
+
+[compliance]
+# Audit logging
+audit_enabled = true
+audit_log_file = "/app/logs/audit.log"
+audit_log_retention_days = 90
+
+# Data retention
+data_retention_policy_enabled = true
+data_retention_days = 2555  # 7 years
+automated_deletion = false
+
+# Privacy
+pii_detection_enabled = true
+data_anonymization_enabled = true
+gdpr_compliance_enabled = true
+
+[recovery]
+# Disaster recovery
+disaster_recovery_enabled = true
+recovery_point_objective_hours = 4
+recovery_time_objective_hours = 2
+
+# Replication
+replication_enabled = true
+replication_factor = 2
+async_replication = true
+
+# Circuit breaker
+circuit_breaker_enabled = true
+failure_threshold = 5
+reset_timeout_seconds = 30
+
+[limits]
+# Resource limits
+max_concurrent_proofs = 10
+max_concurrent_verifications = 100
+max_dataset_entries = 10000000
+max_transaction_size_mb = 50
+
+# API rate limits
+api_calls_per_minute = 10000
+api_burst_size = 1000
+max_concurrent_requests = 500
+
+# System limits
+max_file_descriptors = 65536
+max_open_databases = 100
+max_memory_mapped_files = 1000

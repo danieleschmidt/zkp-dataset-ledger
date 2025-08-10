@@ -1,7 +1,7 @@
-use thiserror::Error;
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use thiserror::Error;
 
 /// Comprehensive error types with detailed context and recovery information
 #[derive(Error, Debug, Clone, Serialize, Deserialize)]
@@ -289,10 +289,10 @@ pub enum LedgerError {
     // Legacy compatibility variants
     #[error("Legacy I/O error: {0}")]
     LegacyIo(String),
-    
+
     #[error("Legacy serialization error: {0}")]
     LegacySerialization(String),
-    
+
     #[error("Legacy JSON error: {0}")]
     LegacyJson(String),
 }
@@ -421,7 +421,9 @@ impl LedgerError {
             LedgerError::ServiceUnavailable { .. } => true,
             LedgerError::Storage { retry_after_ms, .. } => retry_after_ms.is_some(),
             LedgerError::Cryptographic { recoverable, .. } => *recoverable,
-            LedgerError::DataCorruption { recovery_possible, .. } => *recovery_possible,
+            LedgerError::DataCorruption {
+                recovery_possible, ..
+            } => *recovery_possible,
             _ => false,
         }
     }
@@ -451,30 +453,55 @@ impl LedgerError {
     /// Get user-friendly error message
     pub fn user_message(&self) -> String {
         match self {
-            LedgerError::NotFound { resource_type, resource_name, suggestions } => {
+            LedgerError::NotFound {
+                resource_type,
+                resource_name,
+                suggestions,
+            } => {
                 let mut msg = format!("Could not find {} '{}'", resource_type, resource_name);
                 if !suggestions.is_empty() {
                     msg.push_str(&format!(". Did you mean: {}?", suggestions.join(", ")));
                 }
                 msg
             }
-            LedgerError::Validation { field, reason, suggestions, .. } => {
+            LedgerError::Validation {
+                field,
+                reason,
+                suggestions,
+                ..
+            } => {
                 let mut msg = format!("Invalid {}: {}", field, reason);
                 if !suggestions.is_empty() {
                     msg.push_str(&format!(". Try: {}", suggestions.join(", ")));
                 }
                 msg
             }
-            LedgerError::Authentication { reason, lockout_time, .. } => {
+            LedgerError::Authentication {
+                reason,
+                lockout_time,
+                ..
+            } => {
                 let mut msg = format!("Authentication failed: {}", reason);
                 if let Some(lockout) = lockout_time {
-                    msg.push_str(&format!(". Account locked until {}", lockout.format("%Y-%m-%d %H:%M:%S UTC")));
+                    msg.push_str(&format!(
+                        ". Account locked until {}",
+                        lockout.format("%Y-%m-%d %H:%M:%S UTC")
+                    ));
                 }
                 msg
             }
-            LedgerError::RateLimit { limit, window, reset_time, .. } => {
-                format!("Too many requests. Limit: {} per {}. Try again after {}", 
-                        limit, window, reset_time.format("%H:%M:%S UTC"))
+            LedgerError::RateLimit {
+                limit,
+                window,
+                reset_time,
+                ..
+            } => {
+                format!(
+                    "Too many requests. Limit: {} per {}. Try again after {}",
+                    limit,
+                    window,
+                    reset_time.format("%H:%M:%S UTC")
+                )
             }
             _ => self.to_string(),
         }
@@ -509,9 +536,14 @@ impl LedgerError {
         info.insert("error_type".to_string(), self.error_type());
         info.insert("severity".to_string(), format!("{:?}", self.severity()));
         info.insert("recoverable".to_string(), self.is_recoverable().to_string());
-        
+
         match self {
-            LedgerError::Cryptographic { operation, algorithm, key_id, .. } => {
+            LedgerError::Cryptographic {
+                operation,
+                algorithm,
+                key_id,
+                ..
+            } => {
                 info.insert("crypto_operation".to_string(), operation.clone());
                 if let Some(alg) = algorithm {
                     info.insert("algorithm".to_string(), alg.clone());
@@ -520,13 +552,22 @@ impl LedgerError {
                     info.insert("key_id".to_string(), kid.clone());
                 }
             }
-            LedgerError::CircuitConstraint { circuit, witness_values, .. } => {
+            LedgerError::CircuitConstraint {
+                circuit,
+                witness_values,
+                ..
+            } => {
                 info.insert("circuit".to_string(), circuit.clone());
                 for (var, val) in witness_values {
                     info.insert(format!("witness_{}", var), val.clone());
                 }
             }
-            LedgerError::DatasetProcessing { dataset_name, row_count, column_count, .. } => {
+            LedgerError::DatasetProcessing {
+                dataset_name,
+                row_count,
+                column_count,
+                ..
+            } => {
                 info.insert("dataset".to_string(), dataset_name.clone());
                 if let Some(rows) = row_count {
                     info.insert("row_count".to_string(), rows.to_string());
@@ -537,7 +578,7 @@ impl LedgerError {
             }
             _ => {}
         }
-        
+
         info
     }
 
@@ -573,12 +614,15 @@ impl LedgerError {
             LedgerError::ServiceUnavailable { .. } => "service_unavailable",
             LedgerError::ResourceExhaustion { .. } => "resource_exhaustion",
             LedgerError::PerformanceDegradation { .. } => "performance_degradation",
-            LedgerError::Serialization { .. } | LedgerError::LegacySerialization(_) => "serialization",
+            LedgerError::Serialization { .. } | LedgerError::LegacySerialization(_) => {
+                "serialization"
+            }
             LedgerError::Deserialization { .. } => "deserialization",
             LedgerError::Internal { .. } => "internal",
             LedgerError::NotSupported { .. } => "not_supported",
             LedgerError::LegacyJson(_) => "json",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -607,7 +651,8 @@ impl ErrorHandler {
                 user_id: None,
                 session_id: None,
                 request_id: None,
-                environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()),
+                environment: std::env::var("ENVIRONMENT")
+                    .unwrap_or_else(|_| "development".to_string()),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 metadata: HashMap::new(),
             },
@@ -625,7 +670,9 @@ impl ErrorHandler {
     }
 
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
-        self.context.metadata.insert(key.to_string(), value.to_string());
+        self.context
+            .metadata
+            .insert(key.to_string(), value.to_string());
         self
     }
 
@@ -650,7 +697,10 @@ impl ErrorHandler {
         let mut suggestions = Vec::new();
 
         match error {
-            LedgerError::NotFound { suggestions: error_suggestions, .. } => {
+            LedgerError::NotFound {
+                suggestions: error_suggestions,
+                ..
+            } => {
                 for suggestion in error_suggestions {
                     suggestions.push(RecoverySuggestion {
                         action: "retry_with_suggestion".to_string(),
@@ -682,14 +732,21 @@ impl ErrorHandler {
                     prerequisites: vec!["storage_permissions".to_string()],
                 });
             }
-            LedgerError::DataCorruption { recovery_possible: true, .. } => {
+            LedgerError::DataCorruption {
+                recovery_possible: true,
+                ..
+            } => {
                 suggestions.push(RecoverySuggestion {
                     action: "restore_from_backup".to_string(),
-                    description: "Attempt to restore corrupted data from the latest backup".to_string(),
+                    description: "Attempt to restore corrupted data from the latest backup"
+                        .to_string(),
                     automatic: false,
                     risk_level: "high".to_string(),
                     estimated_time_ms: Some(30000),
-                    prerequisites: vec!["backup_available".to_string(), "admin_permission".to_string()],
+                    prerequisites: vec![
+                        "backup_available".to_string(),
+                        "admin_permission".to_string(),
+                    ],
                 });
             }
             _ => {}
@@ -828,7 +885,10 @@ mod tests {
         let error = LedgerError::NotFound {
             resource_type: "dataset".to_string(),
             resource_name: "my_data.csv".to_string(),
-            suggestions: vec!["my_data_v1.csv".to_string(), "my_data_backup.csv".to_string()],
+            suggestions: vec![
+                "my_data_v1.csv".to_string(),
+                "my_data_backup.csv".to_string(),
+            ],
         };
         let message = error.user_message();
         assert!(message.contains("Could not find dataset 'my_data.csv'"));
