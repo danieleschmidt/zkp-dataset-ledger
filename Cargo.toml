@@ -1,1 +1,111 @@
-Execution error
+```toml
+[package]
+name = "zkp-dataset-ledger"
+version = "0.1.0"
+edition = "2021"
+authors = ["Daniel Schmidt <daniel@terragon.ai>"]
+description = "A zero-knowledge-proof ledger that notarizes every dataset version, transformation, and train/eval split"
+repository = "https://github.com/danieleschmidt/zkp-dataset-ledger"
+homepage = "https://zkp-dataset-ledger.org"
+documentation = "https://docs.rs/zkp-dataset-ledger"
+license = "Apache-2.0"
+keywords = ["zero-knowledge", "cryptography", "ml", "audit", "blockchain"]
+categories = ["cryptography", "science", "development-tools"]
+readme = "README.md"
+
+[dependencies]
+# Core ZK and cryptographic libraries - optimized for faster builds
+ark-bls12-381 = { version = "0.5", default-features = false, features = ["curve", "scalar_field"] }
+ark-groth16 = { version = "0.5", default-features = false }
+ark-std = { version = "0.5", default-features = false, features = ["std"] }
+ark-ff = { version = "0.5", default-features = false }
+ark-ec = { version = "0.5", default-features = false }
+ark-poly = { version = "0.5", default-features = false }
+ark-relations = { version = "0.5", default-features = false }
+ark-r1cs-std = { version = "0.5", default-features = false, features = ["std"] }
+ark-crypto-primitives = { version = "0.5", default-features = false, features = ["std", "crh"] }
+ark-snark = { version = "0.5", default-features = false }
+ark-serialize = { version = "0.5", default-features = false }
+ark-ed-on-bls12-381 = { version = "0.5", default-features = false }
+
+# Merkle tree and hashing
+merkletree = "0.23"
+sha3 = "0.10"
+blake3 = "1.5"
+
+# Serialization and data handling - minimal features for faster builds
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "2.0"
+toml = "0.9"
+csv = "1.3"
+polars = { version = "0.50", features = ["csv"], default-features = false }
+hex = "0.4"
+
+# Storage backends
+rocksdb = { version = "0.24", optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+# Async runtime and utilities
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# CLI and logging
+clap = { version = "4.0", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "2.0"
+regex = "1.10"
+num_cpus = "1.16"
+rand = "0.9"
+rayon = "1.8"
+
+# Benchmarking and testing
+criterion = { version = "0.7", optional = true }
+proptest = { version = "1.0", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+criterion = { version = "0.7", features = ["html_reports"] }
+proptest = "1.0"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[features]
+default = ["csv", "json", "rocksdb"]
+csv = ["polars/csv"]
+json = ["polars/json"]
+postgres = ["sqlx"]
+rocksdb = ["dep:rocksdb"]
+benchmarks = ["criterion"]
+property-testing = ["proptest"]
+minimal = []
+
+[[bin]]
+name = "zkp-ledger"
+path = "src/bin/cli.rs"
+
+[[bench]]
+name = "proof_generation"
+harness = false
+required-features = ["benchmarks"]
+
+[[bench]]
+name = "verification"
+harness = false
+required-features = ["benchmarks"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+debug = true
+```
