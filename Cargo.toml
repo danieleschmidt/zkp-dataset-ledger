@@ -42,7 +42,7 @@ polars = { version = "0.50", features = ["csv"], default-features = false }
 hex = "0.4"
 
 # Storage backends
-rocksdb = { version = "0.23", optional = true }
+rocksdb = { version = "0.24", optional = true }
 sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "json"], optional = true }
 
 # Async runtime and utilities
