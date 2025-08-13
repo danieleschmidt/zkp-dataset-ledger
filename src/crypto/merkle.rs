@@ -30,7 +30,7 @@ impl MerkleTree {
         if leaves.is_empty() {
             return Err(LedgerError::validation(
                 "Cannot create tree with no leaves",
-            );
+            ));
         }
 
         // Hash all leaf data
@@ -81,7 +81,7 @@ impl MerkleTree {
         if leaf_hashes.is_empty() {
             return Err(LedgerError::validation(
                 "Cannot create tree with no leaves",
-            );
+            ));
         }
 
         let mut levels = vec![leaf_hashes.clone()];
@@ -204,7 +204,7 @@ impl MerkleTree {
         if leaves.is_empty() {
             return Err(LedgerError::validation(
                 "Cannot create tree with no leaves",
-            );
+            ));
         }
 
         let thread_count = num_threads.unwrap_or_else(num_cpus::get);
@@ -408,7 +408,7 @@ impl MerkleTree {
         if all_leaves.is_empty() {
             return Err(LedgerError::validation(
                 "Cannot create tree with no leaves",
-            );
+            ));
         }
 
         // Use parallel construction for the final tree
