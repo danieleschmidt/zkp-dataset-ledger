@@ -1,3 +1,4 @@
+```toml
 [package]
 name = "zkp-dataset-ledger"
 version = "0.1.0"
@@ -34,3 +35,8 @@ codegen-units = 1
 [profile.dev]
 opt-level = 0
 debug = true
+
+[profile.bench]
+opt-level = 3
+debug = true
+```
