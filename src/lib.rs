@@ -7,6 +7,8 @@ pub use error::{LedgerError, Result};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Simplified dataset representation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,11 +63,12 @@ impl Proof {
     }
 }
 
-/// Simplified ledger for tracking datasets
+/// Simplified ledger for tracking datasets with persistence
 #[derive(Debug)]
 pub struct Ledger {
     pub name: String,
     entries: HashMap<String, LedgerEntry>,
+    storage_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,15 +80,69 @@ pub struct LedgerEntry {
     pub operation: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerStats {
+    pub total_datasets: usize,
+    pub total_operations: usize,
+    pub storage_path: Option<String>,
+}
+
 impl Ledger {
     pub fn new(name: String) -> Self {
         Ledger {
             name,
             entries: HashMap::new(),
+            storage_path: None,
         }
     }
 
+    pub fn with_storage<P: AsRef<Path>>(name: String, storage_path: P) -> Result<Self> {
+        let path = storage_path.as_ref().to_path_buf();
+        
+        // Create storage directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut ledger = Ledger {
+            name,
+            entries: HashMap::new(),
+            storage_path: Some(path),
+        };
+
+        // Load existing entries if file exists
+        ledger.load_entries()?;
+        Ok(ledger)
+    }
+
+    fn load_entries(&mut self) -> Result<()> {
+        if let Some(ref path) = self.storage_path {
+            if path.exists() {
+                let content = fs::read_to_string(path)?;
+                if !content.trim().is_empty() {
+                    self.entries = serde_json::from_str(&content)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn save_entries(&self) -> Result<()> {
+        if let Some(ref path) = self.storage_path {
+            let content = serde_json::to_string_pretty(&self.entries)?;
+            fs::write(path, content)?;
+        }
+        Ok(())
+    }
+
     pub fn notarize_dataset(&mut self, dataset: Dataset, proof_type: String) -> Result<Proof> {
+        // Check if dataset already exists
+        if self.entries.contains_key(&dataset.name) {
+            return Err(LedgerError::already_exists(
+                format!("Dataset '{}' already exists in ledger", dataset.name)
+            ));
+        }
+
         let proof = Proof::new(dataset.hash.clone(), proof_type);
         
         let entry = LedgerEntry {
@@ -97,6 +154,10 @@ impl Ledger {
         };
 
         self.entries.insert(dataset.name, entry);
+        
+        // Save to persistent storage
+        self.save_entries()?;
+        
         Ok(proof)
     }
 
@@ -106,6 +167,28 @@ impl Ledger {
 
     pub fn verify_proof(&self, proof: &Proof) -> bool {
         proof.verify()
+    }
+
+    pub fn list_datasets(&self) -> Vec<&LedgerEntry> {
+        self.entries.values().collect()
+    }
+
+    pub fn get_statistics(&self) -> LedgerStats {
+        LedgerStats {
+            total_datasets: self.entries.len(),
+            total_operations: self.entries.len(), // Simplified for now
+            storage_path: self.storage_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+        }
+    }
+
+    pub fn verify_integrity(&self) -> Result<bool> {
+        // Verify all stored proofs
+        for entry in self.entries.values() {
+            if !self.verify_proof(&entry.proof) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 }
 

@@ -1,0 +1,14 @@
+{
+  "training-data-v1": {
+    "dataset_name": "training-data-v1",
+    "dataset_hash": "2043ccbadd2cd5c95ebfda193d5be78de95f4a6f0c56f82b023f0526e9116c01",
+    "proof": {
+      "dataset_hash": "2043ccbadd2cd5c95ebfda193d5be78de95f4a6f0c56f82b023f0526e9116c01",
+      "proof_data": "simple_proof_integrity",
+      "timestamp": "2025-08-13T03:21:45.937614384+00:00",
+      "proof_type": "integrity"
+    },
+    "timestamp": "2025-08-13T03:21:45.937623881+00:00",
+    "operation": "notarize"
+  }
+}

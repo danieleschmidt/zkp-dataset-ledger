@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
 
 // Import our simplified modules
-use zkp_dataset_ledger::{Config, Dataset, Ledger, Result};
+use zkp_dataset_ledger::{Config, Dataset, Ledger, LedgerStats, Result};
 
 #[derive(Parser)]
 #[command(name = "zkp-ledger")]
@@ -50,6 +49,41 @@ enum Commands {
         /// Dataset name
         dataset: String,
     },
+
+    /// List all datasets in the ledger
+    List {
+        /// Project name to list datasets for
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// Show ledger statistics
+    Stats {
+        /// Project name
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// Verify entire ledger integrity
+    Check {
+        /// Project name
+        #[arg(long)]
+        project: Option<String>,
+    },
+}
+
+fn get_ledger_path(project: Option<String>) -> String {
+    match project {
+        Some(proj) => format!("./{}_ledger/ledger.json", proj),
+        None => "./default_ledger/ledger.json".to_string(),
+    }
+}
+
+fn get_or_create_ledger(project: Option<String>) -> Result<Ledger> {
+    let ledger_path = get_ledger_path(project.clone());
+    let ledger_name = project.unwrap_or_else(|| "default".to_string());
+    
+    Ledger::with_storage(ledger_name, ledger_path)
 }
 
 fn main() -> Result<()> {
@@ -77,7 +111,7 @@ fn main() -> Result<()> {
         Commands::Notarize { dataset, name, proof_type } => {
             println!("Notarizing dataset: {} ({})", name, dataset);
             
-            let mut ledger = Ledger::new("default".to_string());
+            let mut ledger = get_or_create_ledger(None)?;
             
             // Check if file exists
             if !std::path::Path::new(&dataset).exists() {
@@ -101,7 +135,7 @@ fn main() -> Result<()> {
         Commands::History { dataset } => {
             println!("Showing history for dataset: {}", dataset);
             
-            let ledger = Ledger::new("default".to_string());
+            let ledger = get_or_create_ledger(None)?;
             
             match ledger.get_dataset_history(&dataset) {
                 Some(entry) => {
@@ -123,7 +157,7 @@ fn main() -> Result<()> {
         Commands::Verify { dataset } => {
             println!("Verifying dataset: {}", dataset);
             
-            let ledger = Ledger::new("default".to_string());
+            let ledger = get_or_create_ledger(None)?;
             
             match ledger.get_dataset_history(&dataset) {
                 Some(entry) => {
@@ -139,6 +173,57 @@ fn main() -> Result<()> {
                 None => {
                     println!("❌ No proof found for dataset: {}", dataset);
                 }
+            }
+            
+            Ok(())
+        }
+
+        Commands::List { project } => {
+            println!("📋 Listing datasets...");
+            
+            let ledger = get_or_create_ledger(project)?;
+            let datasets = ledger.list_datasets();
+            
+            if datasets.is_empty() {
+                println!("No datasets found in ledger.");
+            } else {
+                println!("Found {} dataset(s):", datasets.len());
+                for entry in datasets {
+                    println!("  • {} ({})", entry.dataset_name, entry.dataset_hash[..8].to_string() + "...");
+                    println!("    Operation: {} | Timestamp: {}", entry.operation, entry.timestamp);
+                }
+            }
+            
+            Ok(())
+        }
+
+        Commands::Stats { project } => {
+            println!("📈 Ledger Statistics");
+            
+            let ledger = get_or_create_ledger(project)?;
+            let stats = ledger.get_statistics();
+            
+            println!("  Total Datasets: {}", stats.total_datasets);
+            println!("  Total Operations: {}", stats.total_operations);
+            if let Some(path) = stats.storage_path {
+                println!("  Storage Path: {}", path);
+            }
+            
+            Ok(())
+        }
+
+        Commands::Check { project } => {
+            println!("🔍 Checking ledger integrity...");
+            
+            let ledger = get_or_create_ledger(project)?;
+            let is_valid = ledger.verify_integrity()?;
+            
+            if is_valid {
+                println!("✅ Ledger integrity check passed!");
+                println!("   All {} proofs are valid", ledger.get_statistics().total_datasets);
+            } else {
+                println!("❌ Ledger integrity check failed!");
+                println!("   Some proofs are invalid");
             }
             
             Ok(())
