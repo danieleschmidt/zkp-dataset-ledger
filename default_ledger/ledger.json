@@ -10,5 +10,17 @@
     },
     "timestamp": "2025-08-13T03:21:45.937623881+00:00",
     "operation": "notarize"
+  },
+  "test-data-v2": {
+    "dataset_name": "test-data-v2",
+    "dataset_hash": "156c6fc0f44927893bde20d584b3676f490a22a1116b1283c1c3c5e7463f6dda",
+    "proof": {
+      "dataset_hash": "156c6fc0f44927893bde20d584b3676f490a22a1116b1283c1c3c5e7463f6dda",
+      "proof_data": "simple_proof_integrity",
+      "timestamp": "2025-08-13T03:23:57.484455173+00:00",
+      "proof_type": "integrity"
+    },
+    "timestamp": "2025-08-13T03:23:57.484464996+00:00",
+    "operation": "notarize"
   }
 }

@@ -5,6 +5,7 @@ pub mod error;
 // Simple modules for basic functionality
 pub use error::{LedgerError, Result};
 
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -23,19 +24,35 @@ pub struct Dataset {
 
 impl Dataset {
     pub fn new(name: String, path: String) -> Result<Self> {
+        info!("Creating dataset '{}' from file: {}", name, path);
+        
         let metadata = std::fs::metadata(&path)
-            .map_err(|e| LedgerError::Io(e))?;
+            .map_err(|e| {
+                error!("Failed to read metadata for file '{}': {}", path, e);
+                LedgerError::Io(e)
+            })?;
         
-        let hash = crate::simple_hash(&std::fs::read(&path)?);
+        debug!("File size: {} bytes", metadata.len());
         
-        Ok(Dataset {
-            name,
-            hash,
+        let data = std::fs::read(&path).map_err(|e| {
+            error!("Failed to read file '{}': {}", path, e);
+            LedgerError::Io(e)
+        })?;
+        
+        let hash = crate::simple_hash(&data);
+        debug!("Generated hash: {}", hash);
+        
+        let dataset = Dataset {
+            name: name.clone(),
+            hash: hash.clone(),
             size: metadata.len(),
             row_count: None,
             column_count: None,
             path: Some(path),
-        })
+        };
+        
+        info!("Successfully created dataset '{}' with hash: {}", name, hash);
+        Ok(dataset)
     }
 }
 
@@ -98,30 +115,51 @@ impl Ledger {
 
     pub fn with_storage<P: AsRef<Path>>(name: String, storage_path: P) -> Result<Self> {
         let path = storage_path.as_ref().to_path_buf();
+        info!("Initializing ledger '{}' with storage: {}", name, path.display());
         
         // Create storage directory if it doesn't exist
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            if !parent.exists() {
+                info!("Creating storage directory: {}", parent.display());
+                fs::create_dir_all(parent).map_err(|e| {
+                    error!("Failed to create storage directory '{}': {}", parent.display(), e);
+                    LedgerError::Io(e)
+                })?;
+            }
         }
 
         let mut ledger = Ledger {
-            name,
+            name: name.clone(),
             entries: HashMap::new(),
             storage_path: Some(path),
         };
 
         // Load existing entries if file exists
         ledger.load_entries()?;
+        info!("Ledger '{}' initialized with {} entries", name, ledger.entries.len());
         Ok(ledger)
     }
 
     fn load_entries(&mut self) -> Result<()> {
         if let Some(ref path) = self.storage_path {
             if path.exists() {
-                let content = fs::read_to_string(path)?;
+                debug!("Loading entries from: {}", path.display());
+                let content = fs::read_to_string(path).map_err(|e| {
+                    error!("Failed to read ledger file '{}': {}", path.display(), e);
+                    LedgerError::Io(e)
+                })?;
+                
                 if !content.trim().is_empty() {
-                    self.entries = serde_json::from_str(&content)?;
+                    self.entries = serde_json::from_str(&content).map_err(|e| {
+                        error!("Failed to parse ledger file '{}': {}", path.display(), e);
+                        LedgerError::Serialization(e)
+                    })?;
+                    info!("Loaded {} entries from storage", self.entries.len());
+                } else {
+                    debug!("Storage file is empty, starting with fresh ledger");
                 }
+            } else {
+                debug!("Storage file does not exist, starting with fresh ledger");
             }
         }
         Ok(())
@@ -129,35 +167,52 @@ impl Ledger {
 
     fn save_entries(&self) -> Result<()> {
         if let Some(ref path) = self.storage_path {
-            let content = serde_json::to_string_pretty(&self.entries)?;
-            fs::write(path, content)?;
+            debug!("Saving {} entries to: {}", self.entries.len(), path.display());
+            let content = serde_json::to_string_pretty(&self.entries).map_err(|e| {
+                error!("Failed to serialize entries: {}", e);
+                LedgerError::Serialization(e)
+            })?;
+            
+            fs::write(path, content).map_err(|e| {
+                error!("Failed to write ledger file '{}': {}", path.display(), e);
+                LedgerError::Io(e)
+            })?;
+            
+            info!("Successfully saved ledger to: {}", path.display());
         }
         Ok(())
     }
 
     pub fn notarize_dataset(&mut self, dataset: Dataset, proof_type: String) -> Result<Proof> {
+        info!("Notarizing dataset '{}' with proof type: {}", dataset.name, proof_type);
+        
         // Check if dataset already exists
         if self.entries.contains_key(&dataset.name) {
+            warn!("Dataset '{}' already exists in ledger", dataset.name);
             return Err(LedgerError::already_exists(
                 format!("Dataset '{}' already exists in ledger", dataset.name)
             ));
         }
 
-        let proof = Proof::new(dataset.hash.clone(), proof_type);
+        debug!("Generating proof for dataset hash: {}", dataset.hash);
+        let proof = Proof::new(dataset.hash.clone(), proof_type.clone());
         
+        let timestamp = chrono::Utc::now().to_rfc3339();
         let entry = LedgerEntry {
             dataset_name: dataset.name.clone(),
             dataset_hash: dataset.hash.clone(),
             proof: proof.clone(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: timestamp.clone(),
             operation: "notarize".to_string(),
         };
 
-        self.entries.insert(dataset.name, entry);
+        self.entries.insert(dataset.name.clone(), entry);
+        debug!("Added entry to ledger, total entries: {}", self.entries.len());
         
         // Save to persistent storage
         self.save_entries()?;
         
+        info!("Successfully notarized dataset '{}' at {}", dataset.name, timestamp);
         Ok(proof)
     }
 

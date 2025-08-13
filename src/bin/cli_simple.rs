@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use log::{debug, error, info, warn};
 
 // Import our simplified modules
 use zkp_dataset_ledger::{Config, Dataset, Ledger, LedgerStats, Result};
@@ -89,8 +90,15 @@ fn get_or_create_ledger(project: Option<String>) -> Result<Ledger> {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // Initialize logging
+    let log_level = if cli.verbose { "debug" } else { "info" };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
+        .format_timestamp_secs()
+        .init();
+
     if cli.verbose {
-        println!("ZKP Dataset Ledger - Simplified Version");
+        info!("ZKP Dataset Ledger - Enhanced Version with Logging");
+        debug!("Verbose logging enabled");
     }
 
     match cli.command {
