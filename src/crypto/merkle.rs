@@ -28,9 +28,9 @@ impl MerkleTree {
     /// Create a new Merkle tree from leaf data.
     pub fn new(leaves: Vec<Vec<u8>>, algorithm: HashAlgorithm) -> Result<Self, LedgerError> {
         if leaves.is_empty() {
-            return Err(LedgerError::InvalidInput(
-                "Cannot create tree with no leaves".to_string(),
-            ));
+            return Err(LedgerError::validation(
+                "Cannot create tree with no leaves",
+            );
         }
 
         // Hash all leaf data
@@ -79,9 +79,9 @@ impl MerkleTree {
         algorithm: HashAlgorithm,
     ) -> Result<Self, LedgerError> {
         if leaf_hashes.is_empty() {
-            return Err(LedgerError::InvalidInput(
-                "Cannot create tree with no leaves".to_string(),
-            ));
+            return Err(LedgerError::validation(
+                "Cannot create tree with no leaves",
+            );
         }
 
         let mut levels = vec![leaf_hashes.clone()];
@@ -117,7 +117,7 @@ impl MerkleTree {
     /// Generate a Merkle proof for a specific leaf.
     pub fn generate_proof(&self, leaf_index: usize) -> Result<MerkleProof, LedgerError> {
         if leaf_index >= self.leaves.len() {
-            return Err(LedgerError::InvalidInput(format!(
+            return Err(LedgerError::validation(format!(
                 "Leaf index {} out of bounds for tree with {} leaves",
                 leaf_index,
                 self.leaves.len()
@@ -202,9 +202,9 @@ impl MerkleTree {
         num_threads: Option<usize>,
     ) -> Result<Self, LedgerError> {
         if leaves.is_empty() {
-            return Err(LedgerError::InvalidInput(
-                "Cannot create tree with no leaves".to_string(),
-            ));
+            return Err(LedgerError::validation(
+                "Cannot create tree with no leaves",
+            );
         }
 
         let thread_count = num_threads.unwrap_or_else(num_cpus::get);
@@ -336,7 +336,7 @@ impl MerkleTree {
         // Validate all indices first
         for &idx in leaf_indices {
             if idx >= self.leaves.len() {
-                return Err(LedgerError::InvalidInput(format!(
+                return Err(LedgerError::validation(format!(
                     "Leaf index {} out of bounds for tree with {} leaves",
                     idx,
                     self.leaves.len()
@@ -406,9 +406,9 @@ impl MerkleTree {
         }
 
         if all_leaves.is_empty() {
-            return Err(LedgerError::InvalidInput(
-                "Cannot create tree with no leaves".to_string(),
-            ));
+            return Err(LedgerError::validation(
+                "Cannot create tree with no leaves",
+            );
         }
 
         // Use parallel construction for the final tree

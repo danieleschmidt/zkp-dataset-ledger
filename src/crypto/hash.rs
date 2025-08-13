@@ -47,7 +47,7 @@ pub fn hash_reader<R: Read>(
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
-                    .map_err(|e| LedgerError::IoError(e.to_string()))?;
+                    .map_err(|e| LedgerError::Io(e))?;
                 if bytes_read == 0 {
                     break;
                 }
@@ -62,7 +62,7 @@ pub fn hash_reader<R: Read>(
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
-                    .map_err(|e| LedgerError::IoError(e.to_string()))?;
+                    .map_err(|e| LedgerError::Io(e))?;
                 if bytes_read == 0 {
                     break;
                 }
@@ -80,7 +80,7 @@ pub fn hash_dataset_file<P: AsRef<std::path::Path>>(
     algorithm: HashAlgorithm,
 ) -> Result<String, LedgerError> {
     let file = std::fs::File::open(path.as_ref())
-        .map_err(|e| LedgerError::IoError(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| LedgerError::Io(e))?;
     hash_reader(file, algorithm)
 }
 
