@@ -2,7 +2,7 @@
 # This variant prioritizes security for production deployments
 
 # Build stage with security scanning
-FROM rust:1.88-slim as builder
+FROM rust:1.89-slim as builder
 
 # Install security updates and minimal dependencies
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \

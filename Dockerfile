@@ -1,5 +1,5 @@
 # Multi-stage build for ZKP Dataset Ledger
-FROM rust:1.88-slim as builder
+FROM rust:1.89-slim as builder
 
 # Install system dependencies for cryptographic libraries
 RUN apt-get update && apt-get install -y \
