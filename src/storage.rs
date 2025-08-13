@@ -130,7 +130,7 @@ pub mod rocksdb_backend {
 
             let path_str = path.as_ref().to_string_lossy().to_string();
             let db = DB::open(&opts, &path_str)
-                .map_err(|e| LedgerError::StorageError(format!("Failed to open RocksDB: {}", e)))?;
+                .map_err(|e| LedgerError::storage(format!("Failed to open RocksDB: {}", e)))?;
 
             Ok(RocksDBStorage {
                 db: Arc::new(db),
@@ -149,7 +149,7 @@ pub mod rocksdb_backend {
             Ok(self
                 .db
                 .property_value(property)
-                .map_err(|e| LedgerError::StorageError(format!("Property query failed: {}", e)))?)
+                .map_err(|e| LedgerError::storage(format!("Property query failed: {}", e)))?)
         }
     }
 
@@ -157,19 +157,19 @@ pub mod rocksdb_backend {
         fn put(&mut self, key: &str, value: &[u8]) -> Result<(), LedgerError> {
             self.db
                 .put(key.as_bytes(), value)
-                .map_err(|e| LedgerError::StorageError(format!("Put operation failed: {}", e)))
+                .map_err(|e| LedgerError::storage(format!("Put operation failed: {}", e)))
         }
 
         fn get(&self, key: &str) -> Result<Option<Vec<u8>>, LedgerError> {
             self.db
                 .get(key.as_bytes())
-                .map_err(|e| LedgerError::StorageError(format!("Get operation failed: {}", e)))
+                .map_err(|e| LedgerError::storage(format!("Get operation failed: {}", e)))
         }
 
         fn delete(&mut self, key: &str) -> Result<(), LedgerError> {
             self.db
                 .delete(key.as_bytes())
-                .map_err(|e| LedgerError::StorageError(format!("Delete operation failed: {}", e)))
+                .map_err(|e| LedgerError::storage(format!("Delete operation failed: {}", e)))
         }
 
         fn list_keys(&self, prefix: &str) -> Result<Vec<String>, LedgerError> {
@@ -188,7 +188,7 @@ pub mod rocksdb_backend {
                         }
                     }
                     Err(e) => {
-                        return Err(LedgerError::StorageError(format!("Iterator error: {}", e)));
+                        return Err(LedgerError::storage(format!("Iterator error: {}", e)));
                     }
                 }
             }
@@ -247,7 +247,7 @@ pub mod postgres_backend {
                 .connect(database_url)
                 .await
                 .map_err(|e| {
-                    LedgerError::StorageError(format!("PostgreSQL connection failed: {}", e))
+                    LedgerError::storage(format!("PostgreSQL connection failed: {}", e))
                 })?;
 
             // Create table if it doesn't exist
@@ -263,11 +263,10 @@ pub mod postgres_backend {
             )
             .execute(&pool)
             .await
-            .map_err(|e| LedgerError::StorageError(format!("Table creation failed: {}", e)))?;
+            .map_err(|e| LedgerError::storage(format!("Table creation failed: {}", e)))?;
 
-            let rt = Runtime::new().map_err(|e| {
-                LedgerError::StorageError(format!("Runtime creation failed: {}", e))
-            })?;
+            let rt = Runtime::new()
+                .map_err(|e| LedgerError::storage(format!("Runtime creation failed: {}", e)))?;
 
             Ok(Self { pool, rt })
         }
@@ -289,7 +288,7 @@ pub mod postgres_backend {
                 .bind(value)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| LedgerError::StorageError(format!("PostgreSQL put failed: {}", e)))?;
+                .map_err(|e| LedgerError::storage(format!("PostgreSQL put failed: {}", e)))?;
 
                 Ok(())
             })
@@ -301,9 +300,7 @@ pub mod postgres_backend {
                     .bind(key)
                     .fetch_optional(&self.pool)
                     .await
-                    .map_err(|e| {
-                        LedgerError::StorageError(format!("PostgreSQL get failed: {}", e))
-                    })?;
+                    .map_err(|e| LedgerError::storage(format!("PostgreSQL get failed: {}", e)))?;
 
                 Ok(row.map(|r| r.get::<Vec<u8>, _>("value")))
             })
@@ -316,7 +313,7 @@ pub mod postgres_backend {
                     .execute(&self.pool)
                     .await
                     .map_err(|e| {
-                        LedgerError::StorageError(format!("PostgreSQL delete failed: {}", e))
+                        LedgerError::storage(format!("PostgreSQL delete failed: {}", e))
                     })?;
 
                 Ok(())
@@ -330,7 +327,7 @@ pub mod postgres_backend {
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| {
-                        LedgerError::StorageError(format!("PostgreSQL list_keys failed: {}", e))
+                        LedgerError::storage(format!("PostgreSQL list_keys failed: {}", e))
                     })?;
 
                 Ok(rows
@@ -348,10 +345,7 @@ pub mod postgres_backend {
                         .fetch_one(&self.pool)
                         .await
                         .map_err(|e| {
-                            LedgerError::StorageError(format!(
-                                "PostgreSQL exists check failed: {}",
-                                e
-                            ))
+                            LedgerError::storage(format!("PostgreSQL exists check failed: {}", e))
                         })?;
 
                 Ok(count > 0)
@@ -365,7 +359,7 @@ pub mod postgres_backend {
                 )
                 .fetch_one(&self.pool)
                 .await
-                .map_err(|e| LedgerError::StorageError(format!("PostgreSQL stats failed: {}", e)))?;
+                .map_err(|e| LedgerError::storage(format!("PostgreSQL stats failed: {}", e)))?;
                 Ok(StorageStats {
                     total_keys: total_keys as usize,
                     total_size_bytes: total_size_bytes as u64,
@@ -396,14 +390,13 @@ pub fn create_storage(backend_type: &str, config: &str) -> Result<Box<dyn Storag
         #[cfg(feature = "postgres")]
         "postgres" => {
             use postgres_backend::PostgresStorage;
-            let rt = tokio::runtime::Runtime::new().map_err(|e| {
-                LedgerError::StorageError(format!("Runtime creation failed: {}", e))
-            })?;
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| LedgerError::storage(format!("Runtime creation failed: {}", e)))?;
             let storage = rt.block_on(PostgresStorage::new(config))?;
             Ok(Box::new(storage))
         }
 
-        _ => Err(LedgerError::StorageError(format!(
+        _ => Err(LedgerError::storage(format!(
             "Unknown storage backend: {}",
             backend_type
         ))),
