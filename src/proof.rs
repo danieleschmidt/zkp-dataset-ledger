@@ -10,6 +10,7 @@ use crate::{Dataset, LedgerError, Result};
 use ark_groth16::{PreparedVerifyingKey, Proof as Groth16Proof, ProvingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::RngCore;
+use rand::thread_rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -428,7 +429,7 @@ impl Proof {
     ) -> Result<(Option<Vec<u8>>, Option<Vec<String>>)> {
         // Convert dataset to field elements
         let dataset_content = Self::dataset_to_field_elements(dataset)?;
-        let nonce = Fr::from(ark_std::rand::thread_rng().next_u64());
+        let nonce = Fr::from(thread_rng().next_u64());
 
         // Compute hash as sum + nonce (matching circuit logic)
         let dataset_hash = dataset_content
@@ -620,7 +621,7 @@ impl Proof {
         let scale = sensitivity / epsilon_fr;
 
         // Simplified noise generation (in practice, use proper sampling)
-        let noise_value = scale * Fr::from(ark_std::rand::thread_rng().next_u64() % 100);
+        let noise_value = scale * Fr::from(thread_rng().next_u64() % 100);
         let noised_result = true_result + noise_value;
 
         let circuit = DifferentialPrivacyCircuit {

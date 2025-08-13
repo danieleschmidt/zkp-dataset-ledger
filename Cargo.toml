@@ -1,4 +1,3 @@
-```toml
 [package]
 name = "zkp-dataset-ledger"
 version = "0.1.0"
@@ -108,4 +107,3 @@ panic = "abort"
 [profile.bench]
 opt-level = 3
 debug = true
-```

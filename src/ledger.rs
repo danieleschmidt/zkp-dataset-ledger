@@ -87,6 +87,19 @@ pub enum Operation {
     },
 }
 
+impl Operation {
+    /// Get the operation type as a string for display and querying.
+    pub fn operation_type(&self) -> &str {
+        match self {
+            Operation::Notarize { .. } => "notarize",
+            Operation::Transform { .. } => "transform",
+            Operation::Split { .. } => "split",
+            Operation::Validate { .. } => "validate",
+            Operation::Custom { operation_type, .. } => operation_type,
+        }
+    }
+}
+
 /// Query parameters for ledger history searches.
 #[derive(Debug, Clone)]
 pub struct LedgerQuery {
@@ -313,7 +326,9 @@ impl Ledger {
         for key in all_keys {
             if let Some(entry_data) = self.storage.get(&key)? {
                 let entry: LedgerEntry =
-                    bincode::deserialize(&entry_data).map_err(|e| LedgerError::Serialization(e))?;
+                    bincode::decode_from_slice(&entry_data, bincode::config::standard())
+                        .map_err(|e| LedgerError::from(e))?
+                        .0;
 
                 // Apply filters
                 if let Some(dataset_name) = &query.dataset_name {
@@ -424,9 +439,11 @@ impl Ledger {
         let key = format!("entry:{}", entry.id);
         let data = if self.config.compression {
             // Would implement compression here
-            bincode::serialize(entry).map_err(|e| LedgerError::Serialization(e))?
+            bincode::encode_to_vec(entry, bincode::config::standard())
+                .map_err(|e| LedgerError::from(e))?
         } else {
-            bincode::serialize(entry).map_err(|e| LedgerError::Serialization(e))?
+            bincode::encode_to_vec(entry, bincode::config::standard())
+                .map_err(|e| LedgerError::from(e))?
         };
 
         self.storage.put(&key, &data)?;
