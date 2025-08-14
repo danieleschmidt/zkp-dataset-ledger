@@ -124,6 +124,7 @@ fn main() -> Result<()> {
             // Check if file exists
             if !std::path::Path::new(&dataset).exists() {
                 return Err(zkp_dataset_ledger::LedgerError::not_found(
+                    "dataset", 
                     format!("Dataset file not found: {}", dataset)
                 ));
             }

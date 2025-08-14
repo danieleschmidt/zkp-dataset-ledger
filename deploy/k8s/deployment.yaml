@@ -1,0 +1,187 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zkp-dataset-ledger
+  namespace: zkp-ledger
+  labels:
+    app: zkp-ledger
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: zkp-ledger
+  template:
+    metadata:
+      labels:
+        app: zkp-ledger
+        version: v1.0.0
+    spec:
+      serviceAccountName: zkp-ledger
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      
+      containers:
+      - name: zkp-ledger
+        image: zkp-dataset-ledger:1.0.0
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # Resource management
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Environment configuration
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: LEDGER_STORAGE_PATH
+          value: "/data/ledger.json"
+        - name: LEDGER_BACKUP_PATH
+          value: "/data/backups"
+        - name: LEDGER_MAX_ENTRIES
+          value: "100000"
+        
+        # Volume mounts
+        volumeMounts:
+        - name: ledger-data
+          mountPath: /data
+        - name: config
+          mountPath: /config
+          readOnly: true
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - zkp-ledger
+            - stats
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - zkp-ledger
+            - check
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Startup probe for slow initialization
+        startupProbe:
+          exec:
+            command:
+            - zkp-ledger
+            - stats
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      
+      volumes:
+      - name: ledger-data
+        persistentVolumeClaim:
+          claimName: zkp-ledger-data
+      - name: config
+        configMap:
+          name: zkp-ledger-config
+      
+      # Pod disruption budget for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - zkp-ledger
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zkp-ledger-service
+  namespace: zkp-ledger
+  labels:
+    app: zkp-ledger
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: zkp-ledger
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zkp-ledger-data
+  namespace: zkp-ledger
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zkp-ledger-config
+  namespace: zkp-ledger
+data:
+  config.toml: |
+    [ledger]
+    name = "production"
+    enable_backup = true
+    backup_interval_hours = 1
+    max_entries = 100000
+    enable_compression = true
+    enable_integrity_checks = true
+    health_check_interval_seconds = 300
+    
+    [security]
+    max_file_size_gb = 10
+    allowed_file_types = ["csv", "json", "jsonl"]
+    
+    [performance]
+    cache_size_mb = 512
+    parallel_threshold = 1000
+    batch_size = 100

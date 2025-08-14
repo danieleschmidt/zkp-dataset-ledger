@@ -370,10 +370,99 @@ pub mod postgres_backend {
     }
 }
 
+/// Simple file-based storage backend
+#[derive(Debug)]
+pub struct FileStorage {
+    file_path: String,
+    data: HashMap<String, Vec<u8>>,
+}
+
+impl FileStorage {
+    pub fn new(file_path: String) -> Result<Self, LedgerError> {
+        let mut storage = Self {
+            file_path: file_path.clone(),
+            data: HashMap::new(),
+        };
+        
+        // Load existing data if file exists
+        if std::path::Path::new(&file_path).exists() {
+            match std::fs::read_to_string(&file_path) {
+                Ok(content) => {
+                    if !content.is_empty() {
+                        match serde_json::from_str(&content) {
+                            Ok(data) => storage.data = data,
+                            Err(_) => {} // Start fresh if JSON is invalid
+                        }
+                    }
+                }
+                Err(_) => {} // Start fresh if file can't be read
+            }
+        }
+        
+        Ok(storage)
+    }
+    
+    fn save(&self) -> Result<(), LedgerError> {
+        let json = serde_json::to_string_pretty(&self.data)
+            .map_err(|e| LedgerError::Storage(format!("JSON serialization failed: {}", e)))?;
+        std::fs::write(&self.file_path, json)
+            .map_err(|e| LedgerError::Storage(format!("File write failed: {}", e)))?;
+        Ok(())
+    }
+}
+
+impl Storage for FileStorage {
+    fn put(&mut self, key: &str, value: &[u8]) -> Result<(), LedgerError> {
+        self.data.insert(key.to_string(), value.to_vec());
+        self.save()
+    }
+
+    fn get(&self, key: &str) -> Result<Option<Vec<u8>>, LedgerError> {
+        Ok(self.data.get(key).cloned())
+    }
+
+    fn delete(&mut self, key: &str) -> Result<(), LedgerError> {
+        self.data.remove(key);
+        self.save()
+    }
+
+    fn list_keys(&self, prefix: &str) -> Result<Vec<String>, LedgerError> {
+        Ok(self
+            .data
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect())
+    }
+
+    fn exists(&self, key: &str) -> Result<bool, LedgerError> {
+        Ok(self.data.contains_key(key))
+    }
+
+    fn stats(&self) -> Result<StorageStats, LedgerError> {
+        let total_size_bytes = self.data.values().map(|v| v.len() as u64).sum();
+
+        Ok(StorageStats {
+            total_keys: self.data.len(),
+            total_size_bytes,
+            backend_type: "file".to_string(),
+        })
+    }
+}
+
 /// Create a storage backend based on configuration.
 pub fn create_storage(backend_type: &str, config: &str) -> Result<Box<dyn Storage>, LedgerError> {
     match backend_type {
         "memory" => Ok(Box::new(MemoryStorage::new())),
+        "file" => {
+            let path = if config.is_empty() {
+                "./zkp_ledger.json"
+            } else {
+                config
+            };
+            let storage = FileStorage::new(path.to_string())?;
+            Ok(Box::new(storage))
+        }
 
         #[cfg(feature = "rocksdb")]
         "rocksdb" => {

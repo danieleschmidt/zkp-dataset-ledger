@@ -1,4 +1,3 @@
-```rust
 //! Error types and handling for ZKP Dataset Ledger.
 
 use std::fmt;
@@ -391,4 +390,3 @@ mod tests {
         assert!(error.user_message().contains("Invalid operation"));
     }
 }
-```
