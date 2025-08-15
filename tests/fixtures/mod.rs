@@ -1,7 +1,6 @@
 // Test fixtures and utilities for ZKP Dataset Ledger
-use serde_json::Value;
 use std::path::{Path, PathBuf};
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::TempDir;
 
 /// Test dataset generator for creating sample data
 pub struct TestDataGenerator {
@@ -252,29 +251,23 @@ pub mod constants {
 
 /// Assertion helpers for cryptographic properties
 pub mod assertions {
-    use super::*;
-
     pub fn assert_proof_valid(proof: &zkp_dataset_ledger::Proof) {
-        assert!(!proof.is_empty(), "Proof should not be empty");
+        assert!(!proof.dataset_hash.is_empty(), "Proof should not be empty");
         // Add more cryptographic property assertions as needed
     }
 
     pub fn assert_dataset_properties(
         dataset: &zkp_dataset_ledger::Dataset,
-        expected_rows: usize,
-        expected_cols: usize,
+        expected_rows: u64,
+        expected_cols: u64,
     ) {
-        assert_eq!(dataset.row_count(), expected_rows, "Row count mismatch");
-        assert_eq!(
-            dataset.column_count(),
-            expected_cols,
-            "Column count mismatch"
-        );
+        assert_eq!(dataset.row_count, Some(expected_rows), "Row count mismatch");
+        assert_eq!(dataset.column_count, Some(expected_cols), "Column count mismatch");
     }
 
     pub fn assert_ledger_integrity(ledger: &zkp_dataset_ledger::Ledger) {
         assert!(ledger
-            .verify_chain_integrity()
+            .verify_integrity()
             .expect("Chain integrity check failed"));
     }
 }

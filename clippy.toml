@@ -7,15 +7,14 @@ cognitive-complexity-threshold = 25
 # Documentation requirements
 missing-docs-in-crate-items = true
 
-# Arithmetic operations (important for crypto)
-integer-arithmetic = "deny"
+# Removed invalid option - handled by deny.toml instead
 
 # String/literal limits
 literal-representation-threshold = 10
-single-char-lifetime-names = false
+single-char-binding-names-threshold = 4
 
-# Enum variant names
-enum-variant-names-threshold = 3
+# Enum variant names  
+enum-variant-name-threshold = 3
 
 # Function parameter limits
 too-many-arguments-threshold = 7
