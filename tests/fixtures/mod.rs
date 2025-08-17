@@ -262,7 +262,11 @@ pub mod assertions {
         expected_cols: u64,
     ) {
         assert_eq!(dataset.row_count, Some(expected_rows), "Row count mismatch");
-        assert_eq!(dataset.column_count, Some(expected_cols), "Column count mismatch");
+        assert_eq!(
+            dataset.column_count,
+            Some(expected_cols),
+            "Column count mismatch"
+        );
     }
 
     pub fn assert_ledger_integrity(ledger: &zkp_dataset_ledger::Ledger) {

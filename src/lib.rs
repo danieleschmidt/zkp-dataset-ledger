@@ -1,6 +1,12 @@
-//! # ZKP Dataset Ledger - Simplified Version
+//! # ZKP Dataset Ledger - Advanced Version
 //!
-//! A basic implementation for cryptographic ML pipeline auditing.
+//! A comprehensive implementation for cryptographic ML pipeline auditing with advanced ZKP circuits.
+
+pub mod circuits;
+pub mod mpc;
+pub mod streaming;
+pub mod enhanced_security;
+pub mod high_performance;
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -21,7 +27,10 @@ pub enum RetryStrategy {
     /// Linear retry with fixed delay
     Linear { max_attempts: u32, delay_ms: u64 },
     /// Exponential backoff retry
-    ExponentialBackoff { max_attempts: u32, base_delay_ms: u64 },
+    ExponentialBackoff {
+        max_attempts: u32,
+        base_delay_ms: u64,
+    },
 }
 
 impl RetryStrategy {
@@ -32,25 +41,39 @@ impl RetryStrategy {
         Fut: std::future::Future<Output = Result<T>>,
     {
         let (max_attempts, get_delay) = match self {
-            RetryStrategy::Linear { max_attempts, delay_ms } => {
-                (*max_attempts, Box::new(|_: u32| *delay_ms) as Box<dyn Fn(u32) -> u64>)
-            }
-            RetryStrategy::ExponentialBackoff { max_attempts, base_delay_ms } => {
-                (*max_attempts, Box::new(move |attempt: u32| base_delay_ms * 2_u64.pow(attempt)) as Box<dyn Fn(u32) -> u64>)
-            }
+            RetryStrategy::Linear {
+                max_attempts,
+                delay_ms,
+            } => (
+                *max_attempts,
+                Box::new(|_: u32| *delay_ms) as Box<dyn Fn(u32) -> u64>,
+            ),
+            RetryStrategy::ExponentialBackoff {
+                max_attempts,
+                base_delay_ms,
+            } => (
+                *max_attempts,
+                Box::new(move |attempt: u32| base_delay_ms * 2_u64.pow(attempt))
+                    as Box<dyn Fn(u32) -> u64>,
+            ),
         };
 
         let mut last_error = None;
-        
+
         for attempt in 0..max_attempts {
             match operation().await {
                 Ok(result) => return Ok(result),
                 Err(error) => {
                     last_error = Some(error.clone());
-                    
+
                     if attempt < max_attempts - 1 && error.is_recoverable() {
                         let delay_ms = get_delay(attempt);
-                        log::warn!("Operation failed (attempt {}), retrying in {}ms: {}", attempt + 1, delay_ms, error);
+                        log::warn!(
+                            "Operation failed (attempt {}), retrying in {}ms: {}",
+                            attempt + 1,
+                            delay_ms,
+                            error
+                        );
                         tokio::time::sleep(Duration::from_millis(delay_ms)).await;
                     } else {
                         log::error!("Operation failed after {} attempts: {}", attempt + 1, error);
@@ -59,7 +82,7 @@ impl RetryStrategy {
                 }
             }
         }
-        
+
         Err(last_error.unwrap())
     }
 }
@@ -142,11 +165,20 @@ impl LedgerError {
         if !self.is_recoverable() {
             return None;
         }
-        
+
         match self {
-            Self::Io(_) => Some(RetryStrategy::ExponentialBackoff { max_attempts: 3, base_delay_ms: 100 }),
-            Self::Storage { .. } => Some(RetryStrategy::ExponentialBackoff { max_attempts: 5, base_delay_ms: 50 }),
-            Self::ProofError { code, .. } if *code < 500 => Some(RetryStrategy::Linear { max_attempts: 2, delay_ms: 200 }),
+            Self::Io(_) => Some(RetryStrategy::ExponentialBackoff {
+                max_attempts: 3,
+                base_delay_ms: 100,
+            }),
+            Self::Storage { .. } => Some(RetryStrategy::ExponentialBackoff {
+                max_attempts: 5,
+                base_delay_ms: 50,
+            }),
+            Self::ProofError { code, .. } if *code < 500 => Some(RetryStrategy::Linear {
+                max_attempts: 2,
+                delay_ms: 200,
+            }),
             _ => None,
         }
     }
@@ -172,15 +204,33 @@ impl Clone for LedgerError {
     fn clone(&self) -> Self {
         match self {
             Self::Io(e) => Self::Io(std::io::Error::new(e.kind(), e.to_string())),
-            Self::Json(_) => Self::Json(serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::Other, "JSON error"))),
-            Self::Csv(_) => Self::Csv(csv::Error::from(std::io::Error::new(std::io::ErrorKind::Other, "CSV error"))),
-            Self::DatasetError { message, recoverable } => Self::DatasetError { message: message.clone(), recoverable: *recoverable },
-            Self::NotFound { resource, details } => Self::NotFound { resource: resource.clone(), details: details.clone() },
-            Self::InvalidInput { field, reason } => Self::InvalidInput { field: field.clone(), reason: reason.clone() },
+            Self::Json(_) => Self::Json(serde_json::Error::io(std::io::Error::other("JSON error"))),
+            Self::Csv(_) => Self::Csv(csv::Error::from(std::io::Error::other("CSV error"))),
+            Self::DatasetError {
+                message,
+                recoverable,
+            } => Self::DatasetError {
+                message: message.clone(),
+                recoverable: *recoverable,
+            },
+            Self::NotFound { resource, details } => Self::NotFound {
+                resource: resource.clone(),
+                details: details.clone(),
+            },
+            Self::InvalidInput { field, reason } => Self::InvalidInput {
+                field: field.clone(),
+                reason: reason.clone(),
+            },
             Self::Config(msg) => Self::Config(msg.clone()),
             Self::Security(msg) => Self::Security(msg.clone()),
-            Self::Storage { operation, reason } => Self::Storage { operation: operation.clone(), reason: reason.clone() },
-            Self::ProofError { reason, code } => Self::ProofError { reason: reason.clone(), code: *code },
+            Self::Storage { operation, reason } => Self::Storage {
+                operation: operation.clone(),
+                reason: reason.clone(),
+            },
+            Self::ProofError { reason, code } => Self::ProofError {
+                reason: reason.clone(),
+                code: *code,
+            },
         }
     }
 }
@@ -622,6 +672,12 @@ pub struct LedgerCache {
     pub stats_cache: Arc<RwLock<Option<(LedgerStats, Instant)>>>, // cached stats with timestamp
 }
 
+impl Default for LedgerCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LedgerCache {
     pub fn new() -> Self {
         Self {
@@ -912,15 +968,26 @@ impl Ledger {
 
     pub fn notarize_dataset(&mut self, dataset: Dataset, proof_type: String) -> Result<Proof> {
         let _monitor = self.start_request_monitoring();
-        
+
         // Enhanced validation with specific error handling
         if dataset.name.is_empty() {
-            self.record_alert(AlertLevel::Warning, "Attempted to notarize dataset with empty name".to_string(), "notarize_dataset".to_string());
-            return Err(LedgerError::invalid_input("dataset_name", "cannot be empty"));
+            self.record_alert(
+                AlertLevel::Warning,
+                "Attempted to notarize dataset with empty name".to_string(),
+                "notarize_dataset".to_string(),
+            );
+            return Err(LedgerError::invalid_input(
+                "dataset_name",
+                "cannot be empty",
+            ));
         }
-        
+
         if dataset.size == 0 {
-            self.record_alert(AlertLevel::Warning, format!("Attempted to notarize empty dataset: {}", dataset.name), "notarize_dataset".to_string());
+            self.record_alert(
+                AlertLevel::Warning,
+                format!("Attempted to notarize empty dataset: {}", dataset.name),
+                "notarize_dataset".to_string(),
+            );
             return Err(LedgerError::dataset_error("Dataset is empty", false));
         }
 
@@ -929,7 +996,11 @@ impl Ledger {
             if *cached_hash == dataset.hash {
                 if let Some(cached_proof) = self.cache.proof_cache.get(&dataset.hash) {
                     log::info!("Using cached proof for dataset: {}", dataset.name);
-                    self.record_alert(AlertLevel::Info, format!("Cache hit for dataset: {}", dataset.name), "notarize_dataset".to_string());
+                    self.record_alert(
+                        AlertLevel::Info,
+                        format!("Cache hit for dataset: {}", dataset.name),
+                        "notarize_dataset".to_string(),
+                    );
                     return Ok(cached_proof.clone());
                 }
             }
@@ -938,7 +1009,11 @@ impl Ledger {
         let proof = match Proof::generate(&dataset, proof_type.clone()) {
             Ok(p) => p,
             Err(e) => {
-                self.record_alert(AlertLevel::Critical, format!("Proof generation failed for {}: {}", dataset.name, e), "notarize_dataset".to_string());
+                self.record_alert(
+                    AlertLevel::Critical,
+                    format!("Proof generation failed for {}: {}", dataset.name, e),
+                    "notarize_dataset".to_string(),
+                );
                 return Err(e);
             }
         };
@@ -970,7 +1045,11 @@ impl Ledger {
 
         self.save()?;
 
-        self.record_alert(AlertLevel::Info, format!("Successfully notarized dataset: {}", dataset.name), "notarize_dataset".to_string());
+        self.record_alert(
+            AlertLevel::Info,
+            format!("Successfully notarized dataset: {}", dataset.name),
+            "notarize_dataset".to_string(),
+        );
         log::info!("Dataset notarized successfully");
 
         Ok(proof)
@@ -1354,9 +1433,9 @@ impl Ledger {
             source: source.clone(),
             metadata: HashMap::new(),
         };
-        
+
         self.monitoring.alerts.lock().push(alert);
-        
+
         // Log alert based on level
         match level {
             AlertLevel::Info => log::info!("[{}] {}", source, message),
@@ -1372,13 +1451,13 @@ impl Ledger {
         let requests = *self.monitoring.requests_processed.lock();
         let errors = *self.monitoring.errors_encountered.lock();
         let response_times = self.monitoring.response_times.lock();
-        
+
         let average_response_time = if response_times.is_empty() {
             0.0
         } else {
             response_times.iter().sum::<u64>() as f64 / response_times.len() as f64
         };
-        
+
         // Calculate cache hit rate (approximate)
         let cache_entries = self.cache.dataset_hashes.len() + self.cache.proof_cache.len();
         let cache_hit_rate = if requests > 0 {
@@ -1386,7 +1465,7 @@ impl Ledger {
         } else {
             0.0
         };
-        
+
         // Storage utilization (basic calculation)
         let storage_size = std::fs::metadata(&self.storage_path)
             .map(|m| m.len())
@@ -1397,7 +1476,7 @@ impl Ledger {
         } else {
             0.0
         };
-        
+
         MonitoringMetrics {
             uptime_seconds: uptime.as_secs(),
             requests_processed: requests,
@@ -1406,8 +1485,16 @@ impl Ledger {
             average_response_time_ms: average_response_time,
             memory_usage_mb: 0.0, // Would need external memory profiling
             storage_utilization,
-            proof_generation_rate: if uptime.as_secs() > 0 { requests as f64 / uptime.as_secs() as f64 } else { 0.0 },
-            verification_success_rate: if requests > 0 { (requests - errors) as f64 / requests as f64 } else { 1.0 },
+            proof_generation_rate: if uptime.as_secs() > 0 {
+                requests as f64 / uptime.as_secs() as f64
+            } else {
+                0.0
+            },
+            verification_success_rate: if requests > 0 {
+                (requests - errors) as f64 / requests as f64
+            } else {
+                1.0
+            },
             last_backup_timestamp: None, // Would be tracked separately
         }
     }
@@ -1424,7 +1511,7 @@ impl Ledger {
         let mut alerts = self.monitoring.alerts.lock();
         alerts.retain(|alert| alert.timestamp > cutoff);
     }
-    
+
     /// Record request start and return a monitoring guard
     fn start_request_monitoring(&self) -> RequestMonitor {
         RequestMonitor {
@@ -1513,19 +1600,20 @@ struct RequestMonitor {
     start_time: Instant,
     requests_counter: Arc<parking_lot::Mutex<u64>>,
     response_times: Arc<parking_lot::Mutex<Vec<u64>>>,
+    #[allow(dead_code)]
     errors_counter: Arc<parking_lot::Mutex<u64>>,
 }
 
 impl Drop for RequestMonitor {
     fn drop(&mut self) {
         let duration_ms = self.start_time.elapsed().as_millis() as u64;
-        
+
         // Record response time
         self.response_times.lock().push(duration_ms);
-        
+
         // Increment request counter
         *self.requests_counter.lock() += 1;
-        
+
         // Keep only recent response times (last 1000)
         let mut times = self.response_times.lock();
         let len = times.len();
@@ -1536,6 +1624,7 @@ impl Drop for RequestMonitor {
 }
 
 impl RequestMonitor {
+    #[allow(dead_code)]
     fn record_error(&self) {
         *self.errors_counter.lock() += 1;
     }

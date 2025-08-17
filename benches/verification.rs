@@ -1,14 +1,14 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;
-use zkp_dataset_ledger::{Dataset, Ledger, ProofConfig};
+use zkp_dataset_ledger::{Dataset, Ledger};
 
 fn benchmark_batch_verification(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_verification");
 
     // Generate multiple proofs for batch verification
     let temp_dir = TempDir::new().unwrap();
-    let ledger_path = temp_dir.path().join("batch_ledger");
-    let mut ledger = Ledger::new(&ledger_path).unwrap();
+    let ledger_path = temp_dir.path().join("batch_ledger.json");
+    let mut ledger = Ledger::with_storage("batch".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
 
     let mut proofs = Vec::new();
     for i in 0..10 {
@@ -17,7 +17,7 @@ fn benchmark_batch_verification(c: &mut Criterion) {
 
         let dataset = Dataset::from_path(&test_csv).unwrap();
         let proof = ledger
-            .notarize_dataset(dataset, &format!("batch-{}", i), ProofConfig::default())
+            .notarize_dataset(dataset, "integrity".to_string())
             .unwrap();
         proofs.push(proof);
     }
@@ -25,7 +25,7 @@ fn benchmark_batch_verification(c: &mut Criterion) {
     group.bench_function("verify_batch_10", |b| {
         b.iter(|| {
             for proof in &proofs {
-                let result = ledger.verify_proof(black_box(proof)).unwrap();
+                let result = ledger.verify_proof(black_box(proof));
                 black_box(result);
             }
         });
@@ -38,8 +38,8 @@ fn benchmark_chain_verification(c: &mut Criterion) {
     let mut group = c.benchmark_group("chain_verification");
 
     let temp_dir = TempDir::new().unwrap();
-    let ledger_path = temp_dir.path().join("chain_ledger");
-    let mut ledger = Ledger::new(&ledger_path).unwrap();
+    let ledger_path = temp_dir.path().join("chain_ledger.json");
+    let mut ledger = Ledger::with_storage("chain".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
 
     // Create a chain of dataset transformations
     for i in 0..5 {
@@ -48,17 +48,13 @@ fn benchmark_chain_verification(c: &mut Criterion) {
 
         let dataset = Dataset::from_path(&test_csv).unwrap();
         ledger
-            .notarize_dataset(
-                dataset,
-                &format!("chain-v{}", i + 1),
-                ProofConfig::default(),
-            )
+            .notarize_dataset(dataset, "integrity".to_string())
             .unwrap();
     }
 
     group.bench_function("verify_chain_5_steps", |b| {
         b.iter(|| {
-            let valid = ledger.verify_chain_integrity().unwrap();
+            let valid = ledger.verify_integrity().unwrap();
             black_box(valid);
         });
     });
