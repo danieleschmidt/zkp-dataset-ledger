@@ -23,9 +23,10 @@ async fn test_ledger_initialization() {
     let _ledger = Ledger::with_storage_and_config(
         "test".to_string(),
         ledger_path.to_string_lossy().to_string(),
-        LedgerConfig::default()
-    ).expect("Failed to initialize ledger");
-    
+        LedgerConfig::default(),
+    )
+    .expect("Failed to initialize ledger");
+
     // The ledger file gets created during operation, not just on initialization
     assert!(ledger_path.parent().unwrap().exists());
 }
@@ -43,8 +44,9 @@ async fn test_dataset_notarization() {
     let mut ledger = Ledger::with_storage_and_config(
         "test".to_string(),
         ledger_path.to_string_lossy().to_string(),
-        LedgerConfig::default()
-    ).expect("Failed to initialize ledger");
+        LedgerConfig::default(),
+    )
+    .expect("Failed to initialize ledger");
     let dataset = Dataset::from_path(&test_csv).expect("Failed to load dataset");
 
     let proof = ledger
@@ -63,8 +65,9 @@ async fn test_audit_trail() {
     let mut ledger = Ledger::with_storage_and_config(
         "test".to_string(),
         ledger_path.to_string_lossy().to_string(),
-        LedgerConfig::default()
-    ).expect("Failed to initialize ledger");
+        LedgerConfig::default(),
+    )
+    .expect("Failed to initialize ledger");
 
     // Create and notarize multiple datasets
     for i in 1..=3 {

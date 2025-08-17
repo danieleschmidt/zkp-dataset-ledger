@@ -29,10 +29,22 @@ rayon = "1.8"
 tokio = { version = "1.0", features = ["full"] }
 dashmap = "6.0"
 parking_lot = "0.12"
+num_cpus = "1.16"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bin]]
 name = "zkp-ledger"
 path = "src/bin/cli_simple.rs"
+
+[[bench]]
+name = "proof_generation"
+harness = false
+
+[[bench]]
+name = "verification"
+harness = false
 
 [profile.release]
 opt-level = 3

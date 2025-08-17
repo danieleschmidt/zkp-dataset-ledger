@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::time::Duration;
 use tempfile::TempDir;
-use zkp_dataset_ledger::{Dataset, Ledger, ProofConfig};
+use zkp_dataset_ledger::{Dataset, Ledger};
 
 fn generate_test_data(rows: usize) -> String {
     let mut data = String::from("id,value,category\n");
@@ -25,8 +25,8 @@ fn benchmark_proof_generation(c: &mut Criterion) {
                     let test_csv = temp_dir.path().join("benchmark_data.csv");
                     std::fs::write(&test_csv, generate_test_data(size)).unwrap();
 
-                    let ledger_path = temp_dir.path().join("benchmark_ledger");
-                    let mut ledger = Ledger::new(&ledger_path).unwrap();
+                    let ledger_path = temp_dir.path().join("benchmark_ledger.json");
+                    let mut ledger = Ledger::with_storage("benchmark".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
                     let dataset = Dataset::from_path(&test_csv).unwrap();
 
                     (ledger, dataset)
@@ -35,8 +35,7 @@ fn benchmark_proof_generation(c: &mut Criterion) {
                     let proof = ledger
                         .notarize_dataset(
                             black_box(dataset),
-                            &format!("benchmark-{}", size),
-                            ProofConfig::default(),
+                            "integrity".to_string(),
                         )
                         .unwrap();
 
@@ -57,17 +56,17 @@ fn benchmark_proof_verification(c: &mut Criterion) {
     let test_csv = temp_dir.path().join("verification_data.csv");
     std::fs::write(&test_csv, generate_test_data(10000)).unwrap();
 
-    let ledger_path = temp_dir.path().join("verification_ledger");
-    let mut ledger = Ledger::new(&ledger_path).unwrap();
+    let ledger_path = temp_dir.path().join("verification_ledger.json");
+    let mut ledger = Ledger::with_storage("verification".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
     let dataset = Dataset::from_path(&test_csv).unwrap();
 
     let proof = ledger
-        .notarize_dataset(dataset, "verification-test", ProofConfig::default())
+        .notarize_dataset(dataset, "integrity".to_string())
         .unwrap();
 
     group.bench_function("verify_10k_rows", |b| {
         b.iter(|| {
-            let result = ledger.verify_proof(black_box(&proof)).unwrap();
+            let result = ledger.verify_proof(black_box(&proof));
             black_box(result);
         });
     });
