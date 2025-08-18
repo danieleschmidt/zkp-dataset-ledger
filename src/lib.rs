@@ -3,10 +3,12 @@
 //! A comprehensive implementation for cryptographic ML pipeline auditing with advanced ZKP circuits.
 
 pub mod circuits;
-pub mod mpc;
-pub mod streaming;
 pub mod enhanced_security;
 pub mod high_performance;
+pub mod mpc;
+pub mod streaming;
+pub mod distributed_proof_generation;
+pub mod auto_scaling;
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -17,6 +19,98 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+/// Re-export research modules
+pub mod research;
+
+/// Dataset format enumeration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DatasetFormat {
+    Csv,
+    Json,
+    Parquet,
+    Unknown,
+}
+
+/// Schema information for datasets
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatasetSchema {
+    pub columns: Vec<ColumnInfo>,
+    pub primary_keys: Vec<String>,
+    pub foreign_keys: Vec<ForeignKeyInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ColumnInfo {
+    pub name: String,
+    pub data_type: String,
+    pub nullable: bool,
+    pub unique: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForeignKeyInfo {
+    pub column: String,
+    pub references_table: String,
+    pub references_column: String,
+}
+
+/// Statistical information about datasets
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatasetStatistics {
+    pub numeric_columns: HashMap<String, NumericStats>,
+    pub categorical_columns: HashMap<String, CategoricalStats>,
+    pub missing_values: HashMap<String, u64>,
+    pub data_quality_score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumericStats {
+    pub mean: f64,
+    pub std_dev: f64,
+    pub min: f64,
+    pub max: f64,
+    pub median: f64,
+    pub quartiles: (f64, f64, f64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoricalStats {
+    pub unique_values: u64,
+    pub most_frequent: String,
+    pub frequency_distribution: HashMap<String, u64>,
+}
+
+/// Proof configuration for different proof types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofConfig {
+    pub proof_type: String,
+    pub security_level: u32,
+    pub privacy_preserving: bool,
+    pub batch_size: Option<usize>,
+}
+
+impl Default for ProofConfig {
+    fn default() -> Self {
+        Self {
+            proof_type: "integrity".to_string(),
+            security_level: 128,
+            privacy_preserving: false,
+            batch_size: None,
+        }
+    }
+}
+
+impl ProofConfig {
+    pub fn high_privacy() -> Self {
+        Self {
+            proof_type: "privacy".to_string(),
+            security_level: 256,
+            privacy_preserving: true,
+            batch_size: Some(1000),
+        }
+    }
+}
 
 /// Main result type for the library
 pub type Result<T> = std::result::Result<T, LedgerError>;
@@ -113,6 +207,9 @@ pub enum LedgerError {
 }
 
 impl LedgerError {
+    pub fn internal(message: &str) -> Self {
+        Self::Config(format!("Internal error: {}", message))
+    }
     pub fn not_found(resource: impl Into<String>, details: impl Into<String>) -> Self {
         Self::NotFound {
             resource: resource.into(),
@@ -265,6 +362,9 @@ pub struct Dataset {
     pub row_count: Option<u64>,
     pub column_count: Option<u64>,
     pub path: Option<String>,
+    pub schema: Option<DatasetSchema>,
+    pub statistics: Option<DatasetStatistics>,
+    pub format: DatasetFormat,
 }
 
 impl Dataset {
@@ -316,7 +416,14 @@ impl Dataset {
             size,
             row_count: Some(row_count),
             column_count: Some(column_count),
-            path: Some(path),
+            path: Some(path.clone()),
+            schema: None,     // Would be populated by schema analysis
+            statistics: None, // Would be populated by statistical analysis
+            format: match Self::get_file_format(&path)? {
+                FileFormat::Csv => DatasetFormat::Csv,
+                FileFormat::Json => DatasetFormat::Json,
+                FileFormat::Unknown => DatasetFormat::Unknown,
+            },
         })
     }
 
