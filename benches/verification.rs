@@ -8,7 +8,11 @@ fn benchmark_batch_verification(c: &mut Criterion) {
     // Generate multiple proofs for batch verification
     let temp_dir = TempDir::new().unwrap();
     let ledger_path = temp_dir.path().join("batch_ledger.json");
-    let mut ledger = Ledger::with_storage("batch".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
+    let mut ledger = Ledger::with_storage(
+        "batch".to_string(),
+        ledger_path.to_string_lossy().to_string(),
+    )
+    .unwrap();
 
     let mut proofs = Vec::new();
     for i in 0..10 {
@@ -39,7 +43,11 @@ fn benchmark_chain_verification(c: &mut Criterion) {
 
     let temp_dir = TempDir::new().unwrap();
     let ledger_path = temp_dir.path().join("chain_ledger.json");
-    let mut ledger = Ledger::with_storage("chain".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
+    let mut ledger = Ledger::with_storage(
+        "chain".to_string(),
+        ledger_path.to_string_lossy().to_string(),
+    )
+    .unwrap();
 
     // Create a chain of dataset transformations
     for i in 0..5 {

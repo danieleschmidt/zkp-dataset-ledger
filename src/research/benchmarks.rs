@@ -1,7 +1,7 @@
 //! Comprehensive benchmarking suite for ZK proof performance analysis.
 
 use crate::research::{AlgorithmMetrics, PerformanceMetrics, ResearchConfig};
-use crate::{Dataset, LedgerError, Result};
+use crate::{Dataset, DatasetFormat, LedgerError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -645,8 +645,8 @@ pub fn generate_regression_baseline() -> Result<Vec<u8>> {
         ("plonk_verify_time", 15u64),
     ];
 
-    bincode::encode_to_vec(&baseline_data, bincode::config::standard())
-        .map_err(|e| LedgerError::from(e))
+    // Use serde_json for simpler serialization
+    serde_json::to_vec(&baseline_data).map_err(|e| LedgerError::Json(e))
 }
 
 #[cfg(test)]

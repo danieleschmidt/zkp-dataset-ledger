@@ -168,7 +168,7 @@ impl ResearchExperiment {
             let start_time = std::time::Instant::now();
 
             // Simulate algorithm execution based on type
-            let (proof_size, memory_usage, security_level) = match algorithm {
+            let (proof_size, memory_usage, _security_level) = match algorithm {
                 "groth16_baseline" => self.simulate_groth16()?,
                 "plonk_optimized" => self.simulate_plonk()?,
                 "stark_streaming" => self.simulate_stark()?,
@@ -291,7 +291,7 @@ impl ResearchExperiment {
     fn calculate_confidence_interval(
         &self,
         metrics: &PerformanceMetrics,
-        alpha: f64,
+        _alpha: f64,
     ) -> (f64, f64) {
         let z_score = 1.96; // 95% confidence for alpha = 0.05
         let margin_error =

@@ -26,17 +26,18 @@ fn benchmark_proof_generation(c: &mut Criterion) {
                     std::fs::write(&test_csv, generate_test_data(size)).unwrap();
 
                     let ledger_path = temp_dir.path().join("benchmark_ledger.json");
-                    let mut ledger = Ledger::with_storage("benchmark".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
+                    let mut ledger = Ledger::with_storage(
+                        "benchmark".to_string(),
+                        ledger_path.to_string_lossy().to_string(),
+                    )
+                    .unwrap();
                     let dataset = Dataset::from_path(&test_csv).unwrap();
 
                     (ledger, dataset)
                 },
                 |(mut ledger, dataset)| {
                     let proof = ledger
-                        .notarize_dataset(
-                            black_box(dataset),
-                            "integrity".to_string(),
-                        )
+                        .notarize_dataset(black_box(dataset), "integrity".to_string())
                         .unwrap();
 
                     black_box(proof);
@@ -57,7 +58,11 @@ fn benchmark_proof_verification(c: &mut Criterion) {
     std::fs::write(&test_csv, generate_test_data(10000)).unwrap();
 
     let ledger_path = temp_dir.path().join("verification_ledger.json");
-    let mut ledger = Ledger::with_storage("verification".to_string(), ledger_path.to_string_lossy().to_string()).unwrap();
+    let mut ledger = Ledger::with_storage(
+        "verification".to_string(),
+        ledger_path.to_string_lossy().to_string(),
+    )
+    .unwrap();
     let dataset = Dataset::from_path(&test_csv).unwrap();
 
     let proof = ledger
