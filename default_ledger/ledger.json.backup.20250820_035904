@@ -1,16 +1,4 @@
 {
-  "1dd7ef4c-c27c-4ecd-8cb9-fab6fd8750ed": {
-    "id": "1dd7ef4c-c27c-4ecd-8cb9-fab6fd8750ed",
-    "dataset_name": "sample-data",
-    "dataset_hash": "6e0ff6f7cbf3827075bce9cd956122e37cbc984f8ab440da668783975ad68618",
-    "operation": "notarize(integrity)",
-    "proof": {
-      "dataset_hash": "6e0ff6f7cbf3827075bce9cd956122e37cbc984f8ab440da668783975ad68618",
-      "proof_type": "integrity",
-      "timestamp": "2025-08-20T03:59:04.084676786Z"
-    },
-    "timestamp": "2025-08-20T03:59:04.084762766Z"
-  },
   "1f802e7b-e8ac-4373-81b4-13d9c83f6e1d": {
     "id": "1f802e7b-e8ac-4373-81b4-13d9c83f6e1d",
     "dataset_name": "robust-test",
@@ -22,6 +10,18 @@
       "timestamp": "2025-08-14T14:16:20.147384869Z"
     },
     "timestamp": "2025-08-14T14:16:20.147453429Z"
+  },
+  "fc79e8dd-1dde-4d67-a919-5a009cd9d41c": {
+    "id": "fc79e8dd-1dde-4d67-a919-5a009cd9d41c",
+    "dataset_name": "employee-data",
+    "dataset_hash": "e822def8fa4a4f74ee64d2646db987efabf194037cdb089d792175940182e6e9",
+    "operation": "notarize(integrity)",
+    "proof": {
+      "dataset_hash": "e822def8fa4a4f74ee64d2646db987efabf194037cdb089d792175940182e6e9",
+      "proof_type": "integrity",
+      "timestamp": "2025-08-14T14:11:48.263723331Z"
+    },
+    "timestamp": "2025-08-14T14:11:48.263783695Z"
   },
   "a924d306-ea68-492c-9de0-e832b6d2f934": {
     "id": "a924d306-ea68-492c-9de0-e832b6d2f934",
@@ -46,29 +46,5 @@
       "timestamp": "2025-08-14T14:14:20.818170156Z"
     },
     "timestamp": "2025-08-14T14:14:20.818283577Z"
-  },
-  "fc79e8dd-1dde-4d67-a919-5a009cd9d41c": {
-    "id": "fc79e8dd-1dde-4d67-a919-5a009cd9d41c",
-    "dataset_name": "employee-data",
-    "dataset_hash": "e822def8fa4a4f74ee64d2646db987efabf194037cdb089d792175940182e6e9",
-    "operation": "notarize(integrity)",
-    "proof": {
-      "dataset_hash": "e822def8fa4a4f74ee64d2646db987efabf194037cdb089d792175940182e6e9",
-      "proof_type": "integrity",
-      "timestamp": "2025-08-14T14:11:48.263723331Z"
-    },
-    "timestamp": "2025-08-14T14:11:48.263783695Z"
-  },
-  "f347c67e-3e46-4a71-aefc-853394724331": {
-    "id": "f347c67e-3e46-4a71-aefc-853394724331",
-    "dataset_name": "bad-data",
-    "dataset_hash": "544283f4c5a15b171fe5f0f49f9c2296922f63932e181096f20ab17fe0f4f853",
-    "operation": "notarize(integrity)",
-    "proof": {
-      "dataset_hash": "544283f4c5a15b171fe5f0f49f9c2296922f63932e181096f20ab17fe0f4f853",
-      "proof_type": "integrity",
-      "timestamp": "2025-08-20T04:03:41.052461020Z"
-    },
-    "timestamp": "2025-08-20T04:03:41.052512682Z"
   }
 }
