@@ -1,8 +1,8 @@
 //! Distributed proof generation for massive datasets using parallel processing and load balancing.
 
-use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
+use crate::{Dataset, LedgerError, ProofConfig, Result};
+use crate::proof::{Proof, ProofType};
 use chrono::{DateTime, Utc};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -132,12 +132,8 @@ impl DistributedProofGenerator {
                 async move {
                     let _permit = semaphore.acquire().await.unwrap();
                     let worker = load_balancer.select_worker().await?;
-                    let result = Self::process_chunk_on_worker(
-                        &worker,
-                        chunk,
-                        &config,
-                        chunk_index,
-                    ).await?;
+                    let result =
+                        Self::process_chunk_on_worker(&worker, chunk, &config, chunk_index).await?;
 
                     Ok::<(ChunkProofResult, String), LedgerError>((result, worker.id))
                 }
@@ -161,7 +157,7 @@ impl DistributedProofGenerator {
 
         // Combine chunk proofs into final proof
         let final_proof = self.combine_chunk_proofs(&chunk_results, dataset, &config)?;
-        
+
         // Cache the result
         let cached_proof = CachedProof {
             proof: final_proof.clone(),
@@ -175,15 +171,11 @@ impl DistributedProofGenerator {
         self.update_metrics(|metrics| {
             metrics.total_proofs_generated += 1;
             metrics.total_processing_time_ms += total_time;
-            metrics.throughput_proofs_per_second = 
-                metrics.total_proofs_generated as f64 / 
-                (metrics.total_processing_time_ms as f64 / 1000.0);
+            metrics.throughput_proofs_per_second = metrics.total_proofs_generated as f64
+                / (metrics.total_processing_time_ms as f64 / 1000.0);
         });
 
-        log::info!(
-            "Distributed proof generation completed in {}ms",
-            total_time
-        );
+        log::info!("Distributed proof generation completed in {}ms", total_time);
 
         Ok(DistributedProofResult {
             proof: final_proof,
@@ -217,12 +209,12 @@ impl DistributedProofGenerator {
     fn create_data_chunks(&self, dataset: &Dataset) -> Result<Vec<DataChunk>> {
         let total_rows = dataset.row_count.unwrap_or(1000);
         let chunk_count = (total_rows as usize + self.chunk_size - 1) / self.chunk_size;
-        
+
         let mut chunks = Vec::new();
         for i in 0..chunk_count {
             let start_row = i * self.chunk_size;
             let end_row = std::cmp::min((i + 1) * self.chunk_size, total_rows as usize);
-            
+
             chunks.push(DataChunk {
                 chunk_id: format!("chunk_{}_{}", dataset.name, i),
                 start_row,
@@ -244,7 +236,7 @@ impl DistributedProofGenerator {
         chunk_index: usize,
     ) -> Result<ChunkProofResult> {
         let start_time = Instant::now();
-        
+
         log::debug!("Processing chunk {} on worker {}", chunk_index, worker.id);
 
         // Simulate chunk processing time based on complexity
@@ -280,10 +272,8 @@ impl DistributedProofGenerator {
     ) -> Result<Proof> {
         // In a real implementation, this would use cryptographic proof aggregation
         // For now, we create a summary proof
-        
-        let total_rows_processed: usize = chunk_results.iter()
-            .map(|r| r.rows_processed)
-            .sum();
+
+        let total_rows_processed: usize = chunk_results.iter().map(|r| r.rows_processed).sum();
 
         log::info!(
             "Combining {} chunk proofs (total rows: {})",
@@ -293,8 +283,16 @@ impl DistributedProofGenerator {
 
         Ok(Proof {
             dataset_hash: dataset.hash.clone(),
-            proof_type: format!("distributed_{}", config.proof_type),
+            proof_data: vec![],
+            public_inputs: vec![total_rows_processed.to_string()],
+            private_inputs_commitment: "distributed_commitment".to_string(),
+            proof_type: ProofType::DatasetIntegrity,
+            merkle_root: None,
+            merkle_proof: None,
             timestamp: Utc::now(),
+            version: "1.0".to_string(),
+            groth16_proof: None,
+            circuit_public_inputs: Some(vec![chunk_results.len().to_string()]),
         })
     }
 
@@ -307,7 +305,7 @@ impl DistributedProofGenerator {
         dataset.hash.hash(&mut hasher);
         config.proof_type.hash(&mut hasher);
         config.security_level.hash(&mut hasher);
-        
+
         format!("proof_cache_{:x}", hasher.finish())
     }
 
@@ -328,7 +326,7 @@ impl DistributedProofGenerator {
     fn cache_proof(&self, cache_key: String, cached_proof: CachedProof) {
         let mut cache = self.proof_cache.lock().unwrap();
         cache.insert(cache_key, cached_proof);
-        
+
         // Clean up old entries if cache is getting large
         if cache.len() > 1000 {
             let now = Utc::now();
@@ -365,18 +363,18 @@ impl DistributedProofGenerator {
         log::info!("Optimizing worker allocation based on performance data");
 
         let current_metrics = self.get_performance_stats();
-        
+
         // Analyze worker performance and suggest optimizations
         let mut recommendations = Vec::new();
-        
+
         if current_metrics.cache_hit_rate < 0.7 {
             recommendations.push("Increase cache TTL to improve hit rate".to_string());
         }
-        
+
         if current_metrics.throughput_proofs_per_second < 10.0 {
             recommendations.push("Consider increasing worker pool size".to_string());
         }
-        
+
         if current_metrics.error_rate > 0.05 {
             recommendations.push("Investigate and fix high error rate".to_string());
         }
@@ -417,14 +415,15 @@ impl LoadBalancer {
 
     fn performance_based_selection(&self) -> Result<WorkerInfo> {
         // Select worker with best performance score
-        let best_worker = self.workers
+        let best_worker = self
+            .workers
             .iter()
             .filter(|w| w.is_healthy)
             .min_by(|a, b| {
-                let score_a = a.current_load * (1.0 - a.success_rate) + 
-                             (a.average_response_time_ms as f64 / 1000.0);
-                let score_b = b.current_load * (1.0 - b.success_rate) + 
-                             (b.average_response_time_ms as f64 / 1000.0);
+                let score_a = a.current_load * (1.0 - a.success_rate)
+                    + (a.average_response_time_ms as f64 / 1000.0);
+                let score_b = b.current_load * (1.0 - b.success_rate)
+                    + (b.average_response_time_ms as f64 / 1000.0);
                 score_a.partial_cmp(&score_b).unwrap()
             })
             .cloned()
@@ -565,7 +564,7 @@ mod tests {
 
         let load_balancer = LoadBalancer::new(workers, LoadBalancingStrategy::PerformanceBased);
         let selected_worker = load_balancer.performance_based_selection().unwrap();
-        
+
         // Should select worker_1 due to lower load and better performance
         assert_eq!(selected_worker.id, "worker_1");
     }

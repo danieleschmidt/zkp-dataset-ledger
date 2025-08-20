@@ -139,7 +139,7 @@ impl BenchmarkSuite {
             self.config.benchmark_iterations
         );
 
-        let mut total_tests = self.algorithms.len() * self.test_datasets.len();
+        let total_tests = self.algorithms.len() * self.test_datasets.len();
         let mut completed_tests = 0;
 
         for algorithm in &self.algorithms.clone() {

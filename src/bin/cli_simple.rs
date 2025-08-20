@@ -1,3 +1,6 @@
+Looking at the merge conflict, I can see that the main difference is around the `Research` command - one side has it implemented but disabled with a TODO comment, while the other side has it completely commented out. I'll resolve this by keeping the cleaner commented-out version since the functionality is disabled anyway.
+
+```rust
 use clap::{Parser, Subcommand};
 use log::{debug, info};
 
@@ -72,20 +75,20 @@ enum Commands {
         project: Option<String>,
     },
 
-    /// Run research benchmarks and analysis
-    Research {
-        /// Type of research to run
-        #[arg(long, default_value = "benchmark")]
-        research_type: String,
+    // /// Run research benchmarks and analysis
+    // Research {
+    //     /// Type of research to run
+    //     #[arg(long, default_value = "benchmark")]
+    //     research_type: String,
 
-        /// Number of iterations for benchmarks
-        #[arg(long, default_value = "100")]
-        iterations: usize,
+    //     /// Number of iterations for benchmarks
+    //     #[arg(long, default_value = "100")]
+    //     iterations: usize,
 
-        /// Output file for research results
-        #[arg(long)]
-        output: Option<String>,
-    },
+    //     /// Output file for research results
+    //     #[arg(long)]
+    //     output: Option<String>,
+    // },
 
     /// Generate comprehensive audit report
     Audit {
@@ -399,96 +402,15 @@ fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::Research {
-            research_type,
-            iterations,
-            output: _output,
-        } => {
-            println!("🔬 Research functionality temporarily disabled");
-            println!("   Type: {}, Iterations: {}", research_type, iterations);
-
-            // TODO: Re-enable when research module is fixed
-            println!("❌ Research module is temporarily disabled for compilation fixes");
-            /*
-            // Unreachable code intentionally commented out during research module fix
-            use zkp_dataset_ledger::research::{
-                OptimizationLevel, ResearchConfig, ResearchExperiment,
-            };
-
-            let config = ResearchConfig {
-                enable_experimental: true,
-                benchmark_iterations: iterations,
-                statistical_significance_level: 0.05,
-                privacy_budget_epsilon: 1.0,
-                federated_threshold: 3,
-                streaming_chunk_size: 1_000_000,
-                optimization_level: OptimizationLevel::Advanced,
-            };
-
-            let mut experiment = ResearchExperiment::new(config);
-
-            // Add sample datasets for analysis
-            match create_sample_datasets() {
-                Ok(datasets) => {
-                    for dataset in datasets {
-                        experiment.add_dataset(dataset);
-                    }
-                }
-                Err(e) => {
-                    println!("Warning: Could not create sample datasets: {}", e);
-                }
-            }
-
-            match research_type.as_str() {
-                "benchmark" => {
-                    println!("Running comprehensive algorithm benchmarks...");
-                    match experiment.run_comparative_study() {
-                        Ok(results) => {
-                            println!("✅ Research completed successfully!");
-                            println!("   Experiment ID: {}", results.experiment_id);
-                            println!(
-                                "   Statistical significance: p = {:.6}",
-                                results.statistical_significance
-                            );
-
-                            if let Some(output_path) = _output {
-                                // let report = zkp_dataset_ledger::research::generate_research_report(
-                                //     &results,
-                                // );
-                                // std::fs::write(&output_path, report)?;
-                                println!("   Report would be saved to: {}", output_path);
-                            } else {
-                                // Display key results
-                                println!("\n📊 Key Results:");
-                                for (algorithm, metrics) in &results.algorithm_comparison {
-                                    println!(
-                                        "   {}: {}ms proof, {}ms verify",
-                                        algorithm,
-                                        metrics.proof_generation_time_ms,
-                                        metrics.verification_time_ms
-                                    );
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("❌ Research failed: {}", e);
-                        }
-                    }
-                }
-                "circuits" => {
-                    println!("Running advanced circuit analysis...");
-                    // Would implement circuit-specific research
-                    println!("✅ Circuit analysis completed!");
-                }
-                _ => {
-                    println!("❌ Unknown research type: {}", research_type);
-                    println!("   Supported types: benchmark, circuits");
-                }
-            }
-            */
-            
-            Ok(())
-        }
+        // Commands::Research {
+        //     research_type,
+        //     iterations,
+        //     output,
+        // } => {
+        //     println!("🔬 Research functionality temporarily disabled");
+        //     println!("   Type: {}, Iterations: {}", research_type, iterations);
+        //     Ok(())
+        // }
 
         Commands::Audit {
             dataset,
@@ -561,3 +483,4 @@ mod tests {
         assert!(cli.is_ok());
     }
 }
+```

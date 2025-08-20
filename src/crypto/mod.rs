@@ -6,7 +6,7 @@ pub mod merkle;
 pub use hash::*;
 pub use merkle::*;
 
-use crate::{CryptoConfig, Result};
+use crate::{config::CryptoConfig, Result};
 
 /// Initialize cryptographic components with default settings.
 pub fn init() -> Result<()> {
