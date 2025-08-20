@@ -5,6 +5,7 @@
 
 pub mod advanced_circuits;
 pub mod benchmarks;
+pub mod breakthrough_algorithms;
 pub mod differential_privacy;
 pub mod federated_proofs;
 pub mod optimization;
