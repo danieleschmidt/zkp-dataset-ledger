@@ -117,9 +117,11 @@ fn get_or_create_ledger(project: Option<String>) -> Result<Ledger> {
 }
 
 /// Create sample datasets for research and testing
+#[allow(dead_code)]  // TODO: Use for research functionality
 fn create_sample_datasets() -> Result<Vec<Dataset>> {
-    use std::collections::HashMap;
-    use zkp_dataset_ledger::{Dataset, DatasetFormat, DatasetSchema, DatasetStatistics};
+    // use std::collections::HashMap;  // TODO: Use for metadata
+    use zkp_dataset_ledger::{Dataset, DatasetFormat};
+    // Note: DatasetSchema, DatasetStatistics not used in disabled research functionality
 
     let datasets = vec![
         Dataset {
@@ -400,11 +402,15 @@ fn main() -> Result<()> {
         Commands::Research {
             research_type,
             iterations,
-            output,
+            output: _output,
         } => {
-            println!("🔬 Running ZK research analysis: {}", research_type);
-            println!("   Iterations: {}", iterations);
+            println!("🔬 Research functionality temporarily disabled");
+            println!("   Type: {}, Iterations: {}", research_type, iterations);
 
+            // TODO: Re-enable when research module is fixed
+            println!("❌ Research module is temporarily disabled for compilation fixes");
+            /*
+            // Unreachable code intentionally commented out during research module fix
             use zkp_dataset_ledger::research::{
                 OptimizationLevel, ResearchConfig, ResearchExperiment,
             };
@@ -445,12 +451,12 @@ fn main() -> Result<()> {
                                 results.statistical_significance
                             );
 
-                            if let Some(output_path) = output {
-                                let report = zkp_dataset_ledger::research::generate_research_report(
-                                    &results,
-                                );
-                                std::fs::write(&output_path, report)?;
-                                println!("   Report saved to: {}", output_path);
+                            if let Some(output_path) = _output {
+                                // let report = zkp_dataset_ledger::research::generate_research_report(
+                                //     &results,
+                                // );
+                                // std::fs::write(&output_path, report)?;
+                                println!("   Report would be saved to: {}", output_path);
                             } else {
                                 // Display key results
                                 println!("\n📊 Key Results:");
@@ -479,7 +485,8 @@ fn main() -> Result<()> {
                     println!("   Supported types: benchmark, circuits");
                 }
             }
-
+            */
+            
             Ok(())
         }
 
