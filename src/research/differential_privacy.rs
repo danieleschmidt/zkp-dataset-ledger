@@ -140,17 +140,20 @@ impl DifferentialPrivacyEngine {
     /// Generate noise based on the configured mechanism
     fn generate_noise(&self, sensitivity: f64) -> Result<f64> {
         use rand::thread_rng;
-        use rand_distr::{Distribution, Laplace, Normal};
+        use rand_distr::{Distribution, Normal};
 
         let mut rng = thread_rng();
 
         match self.config.noise_mechanism {
             NoiseMechanism::Laplace => {
                 let scale = sensitivity / self.config.epsilon;
-                let laplace = Laplace::new(0.0, scale).map_err(|e| {
-                    LedgerError::internal(&format!("Failed to create Laplace distribution: {}", e))
+                // Use exponential distribution as approximation for Laplace
+                use rand::Rng;
+                let exponential = rand_distr::Exp::new(1.0 / scale).map_err(|e| {
+                    LedgerError::internal(&format!("Failed to create exponential distribution: {}", e))
                 })?;
-                Ok(laplace.sample(&mut rng))
+                let sign = if rng.gen::<bool>() { 1.0 } else { -1.0 };
+                Ok(exponential.sample(&mut rng) * sign)
             }
             NoiseMechanism::Gaussian => {
                 let sigma = sensitivity * (2.0 * (1.25 / self.config.delta).ln()).sqrt()

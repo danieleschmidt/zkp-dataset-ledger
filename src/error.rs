@@ -300,18 +300,20 @@ impl From<csv::Error> for LedgerError {
 }
 
 /// Converts Polars errors to LedgerError.
-impl From<polars::prelude::PolarsError> for LedgerError {
-    fn from(err: polars::prelude::PolarsError) -> Self {
-        LedgerError::DatasetValidation(err.to_string())
-    }
-}
+// Commented out until polars dependency is added
+// impl From<polars::prelude::PolarsError> for LedgerError {
+//     fn from(err: polars::prelude::PolarsError) -> Self {
+//         LedgerError::DatasetValidation(err.to_string())
+//     }
+// }
 
 /// Converts TOML deserialization errors to LedgerError.
-impl From<toml::de::Error> for LedgerError {
-    fn from(err: toml::de::Error) -> Self {
-        LedgerError::Config(err.to_string())
-    }
-}
+// Commented out until toml dependency is added
+// impl From<toml::de::Error> for LedgerError {
+//     fn from(err: toml::de::Error) -> Self {
+//         LedgerError::Config(err.to_string())
+//     }
+// }
 
 /// Converts bincode errors to LedgerError.
 impl From<bincode::error::EncodeError> for LedgerError {

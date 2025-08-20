@@ -1,6 +1,6 @@
 //! Streaming zero-knowledge proofs for large dataset processing.
 
-use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
+use crate::{Dataset, LedgerError, ProofConfig, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -170,11 +170,13 @@ impl StreamingZkProcessor {
             state.chunk_count += 1;
 
             // Update global merkle root by combining with chunk root
+            let current_root = state.global_merkle_root.clone();
             state.global_merkle_root =
-                self.combine_merkle_roots(&state.global_merkle_root, &chunk_proof.merkle_root)?;
+                self.combine_merkle_roots(&current_root, &chunk_proof.merkle_root)?;
 
             // Update statistics accumulator
-            self.update_statistics_accumulator(&mut state.statistics_accumulator, &chunk_proof)?;
+            let chunk_proof_clone = chunk_proof.clone();
+            self.update_statistics_accumulator(&mut state.statistics_accumulator, &chunk_proof_clone)?;
         } else {
             // Initialize accumulated state with first chunk
             self.accumulated_state = Some(AccumulatedState {
@@ -301,19 +303,19 @@ impl StreamingZkProcessor {
         &self,
         dataset: &Dataset,
         state: &AccumulatedState,
-    ) -> Result<Proof> {
-        Ok(Proof {
+    ) -> Result<crate::proof::Proof> {
+        Ok(crate::proof::Proof {
             dataset_hash: format!("streaming_{}", dataset.hash),
             proof_data: state.global_merkle_root.as_bytes().to_vec(),
-            public_inputs: vec![state.total_rows_processed as u64],
+            public_inputs: vec![state.total_rows_processed.to_string()],
             private_inputs_commitment: "streaming_commitment".to_string(),
-            proof_type: crate::ProofType::DatasetIntegrity,
+            proof_type: crate::proof::ProofType::DatasetIntegrity,
             merkle_root: Some(state.global_merkle_root.clone()),
             merkle_proof: None,
             timestamp: chrono::Utc::now(),
             version: "streaming_1.0".to_string(),
             groth16_proof: None,
-            circuit_public_inputs: Some(vec![state.chunk_count as u64]),
+            circuit_public_inputs: Some(vec![state.chunk_count.to_string()]),
         })
     }
 
@@ -326,7 +328,7 @@ impl StreamingZkProcessor {
     /// Verify streaming proof incrementally
     pub fn verify_streaming_proof(&self, streaming_proof: &StreamingProof) -> Result<bool> {
         // Verify aggregated proof
-        if !streaming_proof.aggregated_proof.verify()? {
+        if !streaming_proof.aggregated_proof.verify() {
             return Ok(false);
         }
 
@@ -357,7 +359,7 @@ pub struct StreamingProof {
     pub total_chunks: usize,
     pub total_rows_processed: usize,
     pub global_merkle_root: String,
-    pub aggregated_proof: Proof,
+    pub aggregated_proof: crate::proof::Proof,
     pub chunk_proof_hashes: Vec<String>,
     pub streaming_algorithm: StreamingAlgorithm,
     pub incremental_verification: bool,
@@ -366,7 +368,7 @@ pub struct StreamingProof {
 impl StreamingProof {
     /// Verify the streaming proof
     pub fn verify(&self) -> Result<bool> {
-        self.aggregated_proof.verify()
+        Ok(self.aggregated_proof.verify())
     }
 
     /// Get proof size in bytes
@@ -464,10 +466,15 @@ mod tests {
     fn test_streaming_proof_verification() {
         let config = StreamingConfig::default();
         let processor = StreamingZkProcessor::new(config);
-        let mut small_processor = StreamingZkProcessor::new(StreamingConfig {
+        let small_config = StreamingConfig {
             chunk_size: 1000,
-            ..config
-        });
+            overlap_size: 0,
+            enable_incremental_verification: true,
+            enable_parallel_chunks: false,
+            memory_limit_mb: 1024,
+            streaming_algorithm: StreamingAlgorithm::FixedChunks,
+        };
+        let mut small_processor = StreamingZkProcessor::new(small_config);
 
         let dataset = create_large_test_dataset();
         let proof_config = ProofConfig::default();
