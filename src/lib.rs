@@ -2,13 +2,15 @@
 //!
 //! A comprehensive implementation for cryptographic ML pipeline auditing with advanced ZKP circuits.
 
+pub mod auto_scaling;
 pub mod circuits;
+pub mod distributed_proof_generation;
 pub mod enhanced_security;
 pub mod high_performance;
 pub mod mpc;
+pub mod research;
+pub mod scaling_optimizations;
 pub mod streaming;
-pub mod distributed_proof_generation;
-pub mod auto_scaling;
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -21,7 +23,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Re-export research modules
-pub mod research;
 
 /// Dataset format enumeration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

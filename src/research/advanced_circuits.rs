@@ -88,14 +88,14 @@ impl PolynomialCommitmentCircuit {
         }
 
         coefficients.push(Fr::from(dataset.size));
-        
+
         // Add data quality indicators
         let quality_score = Self::compute_dataset_quality(dataset);
         coefficients.push(Fr::from((quality_score * 1000.0) as u64));
 
         // Adaptive batch sizing based on dataset complexity
         let batch_size = Self::calculate_optimal_batch_size(dataset);
-        
+
         // Statistical confidence threshold (99.9% confidence)
         let confidence_threshold = Fr::from(999u64);
 
@@ -151,7 +151,7 @@ impl PolynomialCommitmentCircuit {
     /// Calculate optimal batch size for processing efficiency
     fn calculate_optimal_batch_size(dataset: &Dataset) -> usize {
         let base_size = 1000;
-        
+
         if let Some(rows) = dataset.row_count {
             if rows > 1_000_000 {
                 return base_size * 10; // Large datasets need bigger batches
@@ -167,7 +167,7 @@ impl PolynomialCommitmentCircuit {
     fn compute_optimized_commitment(coefficients: &[Fr]) -> Fr {
         // Batch processing for improved performance
         let batch_size = 64; // Optimal for most architectures
-        
+
         coefficients
             .chunks(batch_size)
             .map(|chunk| {

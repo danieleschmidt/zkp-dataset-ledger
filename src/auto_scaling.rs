@@ -115,13 +115,33 @@ pub struct ScalingPolicy {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ScalingCondition {
-    CpuThreshold { threshold: f64, duration_seconds: u64 },
-    MemoryThreshold { threshold: f64, duration_seconds: u64 },
-    QueueDepthThreshold { threshold: usize, duration_seconds: u64 },
-    ResponseTimeThreshold { threshold_ms: u64, duration_seconds: u64 },
-    ErrorRateThreshold { threshold: f64, duration_seconds: u64 },
-    PredictiveLoad { predicted_increase_percent: f64 },
-    CompositeCondition { conditions: Vec<ScalingCondition>, operator: LogicalOperator },
+    CpuThreshold {
+        threshold: f64,
+        duration_seconds: u64,
+    },
+    MemoryThreshold {
+        threshold: f64,
+        duration_seconds: u64,
+    },
+    QueueDepthThreshold {
+        threshold: usize,
+        duration_seconds: u64,
+    },
+    ResponseTimeThreshold {
+        threshold_ms: u64,
+        duration_seconds: u64,
+    },
+    ErrorRateThreshold {
+        threshold: f64,
+        duration_seconds: u64,
+    },
+    PredictiveLoad {
+        predicted_increase_percent: f64,
+    },
+    CompositeCondition {
+        conditions: Vec<ScalingCondition>,
+        operator: LogicalOperator,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,7 +163,7 @@ impl AutoScaler {
     pub fn new(config: ScalingConfig) -> Self {
         let metrics_collector = Arc::new(Mutex::new(MetricsCollector::new()));
         let scaling_decisions = Arc::new(Mutex::new(VecDeque::new()));
-        
+
         let initial_resources = ResourceAllocation {
             worker_count: config.min_workers,
             cpu_cores_per_worker: 2,
@@ -169,14 +189,14 @@ impl AutoScaler {
     /// Start the auto-scaling monitoring loop
     pub async fn start_monitoring(&self) -> Result<()> {
         log::info!("Starting auto-scaling monitoring");
-        
-        let mut interval = tokio::time::interval(
-            tokio::time::Duration::from_secs(self.config.evaluation_interval_seconds)
-        );
+
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            self.config.evaluation_interval_seconds,
+        ));
 
         loop {
             interval.tick().await;
-            
+
             if let Err(e) = self.evaluate_and_scale().await {
                 log::error!("Auto-scaling evaluation error: {}", e);
             }
@@ -209,7 +229,12 @@ impl AutoScaler {
         }
 
         // Execute scaling decision
-        if matches!(scaling_decision.decision_type, ScalingDecisionType::ScaleUp | ScalingDecisionType::ScaleDown | ScalingDecisionType::Emergency) {
+        if matches!(
+            scaling_decision.decision_type,
+            ScalingDecisionType::ScaleUp
+                | ScalingDecisionType::ScaleDown
+                | ScalingDecisionType::Emergency
+        ) {
             self.execute_scaling_decision(&scaling_decision).await?;
         }
 
@@ -222,7 +247,7 @@ impl AutoScaler {
     /// Collect current system metrics
     async fn collect_current_metrics(&self) -> Result<()> {
         let now = Utc::now();
-        
+
         // In a real implementation, these would be collected from system monitoring
         let cpu_usage = self.get_current_cpu_usage().await;
         let memory_usage = self.get_current_memory_usage().await;
@@ -232,11 +257,16 @@ impl AutoScaler {
         let queue_depth = self.get_current_queue_depth().await;
 
         let mut collector = self.metrics_collector.lock().unwrap();
-        
+
         collector.add_metric("cpu", cpu_usage, now, "system".to_string());
         collector.add_metric("memory", memory_usage, now, "system".to_string());
         collector.add_metric("requests", request_rate, now, "application".to_string());
-        collector.add_metric("response_time", response_time, now, "application".to_string());
+        collector.add_metric(
+            "response_time",
+            response_time,
+            now,
+            "application".to_string(),
+        );
         collector.add_metric("error_rate", error_rate, now, "application".to_string());
         collector.add_metric("queue_depth", queue_depth, now, "application".to_string());
 
@@ -247,9 +277,9 @@ impl AutoScaler {
     fn evaluate_scaling_policies(&self) -> Result<ScalingDecision> {
         let collector = self.metrics_collector.lock().unwrap();
         let current_resources = self.current_resources.lock().unwrap();
-        
+
         let mut triggered_policies = Vec::new();
-        
+
         for policy in &self.scaling_policies {
             if !policy.enabled {
                 continue;
@@ -262,7 +292,7 @@ impl AutoScaler {
 
         // Sort by priority and select the highest priority action
         triggered_policies.sort_by_key(|p| p.priority);
-        
+
         if let Some(policy) = triggered_policies.first() {
             let (decision_type, target_workers) = match &policy.action {
                 ScalingAction::ScaleToCount(count) => {
@@ -271,21 +301,32 @@ impl AutoScaler {
                     } else if *count < current_resources.worker_count {
                         (ScalingDecisionType::ScaleDown, *count)
                     } else {
-                        (ScalingDecisionType::NoAction, current_resources.worker_count)
+                        (
+                            ScalingDecisionType::NoAction,
+                            current_resources.worker_count,
+                        )
                     }
-                },
+                }
                 ScalingAction::ScaleByCount(delta) => {
-                    let new_count = (current_resources.worker_count as i32 + delta).max(self.config.min_workers as i32).min(self.config.max_workers as i32) as usize;
+                    let new_count = (current_resources.worker_count as i32 + delta)
+                        .max(self.config.min_workers as i32)
+                        .min(self.config.max_workers as i32)
+                        as usize;
                     if new_count > current_resources.worker_count {
                         (ScalingDecisionType::ScaleUp, new_count)
                     } else if new_count < current_resources.worker_count {
                         (ScalingDecisionType::ScaleDown, new_count)
                     } else {
-                        (ScalingDecisionType::NoAction, current_resources.worker_count)
+                        (
+                            ScalingDecisionType::NoAction,
+                            current_resources.worker_count,
+                        )
                     }
-                },
+                }
                 ScalingAction::ScaleByPercent(percent) => {
-                    let new_count = ((current_resources.worker_count as f64 * (1.0 + *percent as f64 / 100.0)).round() as usize)
+                    let new_count = ((current_resources.worker_count as f64
+                        * (1.0 + *percent as f64 / 100.0))
+                        .round() as usize)
                         .max(self.config.min_workers)
                         .min(self.config.max_workers);
                     if new_count > current_resources.worker_count {
@@ -293,12 +334,15 @@ impl AutoScaler {
                     } else if new_count < current_resources.worker_count {
                         (ScalingDecisionType::ScaleDown, new_count)
                     } else {
-                        (ScalingDecisionType::NoAction, current_resources.worker_count)
+                        (
+                            ScalingDecisionType::NoAction,
+                            current_resources.worker_count,
+                        )
                     }
-                },
+                }
                 ScalingAction::Emergency => {
                     (ScalingDecisionType::Emergency, self.config.max_workers)
-                },
+                }
             };
 
             let mut trigger_metrics = HashMap::new();
@@ -333,24 +377,35 @@ impl AutoScaler {
     /// Apply predictive scaling based on historical trends
     fn apply_predictive_scaling(&self, mut decision: ScalingDecision) -> Result<ScalingDecision> {
         let collector = self.metrics_collector.lock().unwrap();
-        
+
         // Analyze request rate trend over the last hour
-        let request_trend = collector.calculate_trend(&collector.request_rate_history, Duration::minutes(60));
-        
-        if request_trend > 0.2 { // 20% increase trend
+        let request_trend =
+            collector.calculate_trend(&collector.request_rate_history, Duration::minutes(60));
+
+        if request_trend > 0.2 {
+            // 20% increase trend
             // Predict we'll need more capacity soon
             if matches!(decision.decision_type, ScalingDecisionType::NoAction) {
                 decision.decision_type = ScalingDecisionType::ScaleUp;
                 decision.to_workers = (decision.from_workers + 1).min(self.config.max_workers);
-                decision.reasoning = format!("{} + Predictive scaling (trend: +{:.1}%)", decision.reasoning, request_trend * 100.0);
+                decision.reasoning = format!(
+                    "{} + Predictive scaling (trend: +{:.1}%)",
+                    decision.reasoning,
+                    request_trend * 100.0
+                );
                 decision.confidence_score *= 0.7; // Lower confidence for predictive actions
             }
-        } else if request_trend < -0.2 { // 20% decrease trend
+        } else if request_trend < -0.2 {
+            // 20% decrease trend
             // We might be able to scale down soon
             if matches!(decision.decision_type, ScalingDecisionType::NoAction) {
                 decision.decision_type = ScalingDecisionType::ScaleDown;
                 decision.to_workers = (decision.from_workers - 1).max(self.config.min_workers);
-                decision.reasoning = format!("{} + Predictive scaling (trend: {:.1}%)", decision.reasoning, request_trend * 100.0);
+                decision.reasoning = format!(
+                    "{} + Predictive scaling (trend: {:.1}%)",
+                    decision.reasoning,
+                    request_trend * 100.0
+                );
                 decision.confidence_score *= 0.6; // Even lower confidence for predictive scale-down
             }
         }
@@ -363,28 +418,37 @@ impl AutoScaler {
         let current_resources = self.current_resources.lock().unwrap();
         let current_cost_per_hour = current_resources.cost_per_hour;
         let new_cost_per_hour = decision.to_workers as f64 * 0.50;
-        
+
         // If cost would increase significantly, apply more conservative scaling
-        let cost_increase_percent = (new_cost_per_hour - current_cost_per_hour) / current_cost_per_hour;
-        
-        if cost_increase_percent > 0.5 { // More than 50% cost increase
+        let cost_increase_percent =
+            (new_cost_per_hour - current_cost_per_hour) / current_cost_per_hour;
+
+        if cost_increase_percent > 0.5 {
+            // More than 50% cost increase
             match decision.decision_type {
                 ScalingDecisionType::ScaleUp => {
                     // Scale up more conservatively
                     decision.to_workers = (decision.from_workers + 1).min(decision.to_workers);
-                    decision.reasoning = format!("{} + Cost optimization (reduced scale-up)", decision.reasoning);
-                },
+                    decision.reasoning = format!(
+                        "{} + Cost optimization (reduced scale-up)",
+                        decision.reasoning
+                    );
+                }
                 _ => {}
             }
-        } else if cost_increase_percent < -0.3 { // More than 30% cost decrease opportunity
+        } else if cost_increase_percent < -0.3 {
+            // More than 30% cost decrease opportunity
             match decision.decision_type {
                 ScalingDecisionType::ScaleDown | ScalingDecisionType::NoAction => {
                     // Be more aggressive about scaling down to save cost
                     if decision.to_workers > self.config.min_workers {
                         decision.decision_type = ScalingDecisionType::ScaleDown;
-                        decision.reasoning = format!("{} + Cost optimization (aggressive scale-down)", decision.reasoning);
+                        decision.reasoning = format!(
+                            "{} + Cost optimization (aggressive scale-down)",
+                            decision.reasoning
+                        );
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -395,7 +459,7 @@ impl AutoScaler {
     /// Check if we're in cooldown period after last scaling action
     fn is_in_cooldown_period(&self) -> Result<bool> {
         let decisions = self.scaling_decisions.lock().unwrap();
-        
+
         if let Some(last_decision) = decisions.iter().find(|d| d.executed) {
             let cooldown_duration = Duration::minutes(self.config.cooldown_period_minutes);
             let time_since_last_action = Utc::now() - last_decision.timestamp;
@@ -408,7 +472,7 @@ impl AutoScaler {
     /// Execute a scaling decision
     async fn execute_scaling_decision(&self, decision: &ScalingDecision) -> Result<()> {
         let start_time = std::time::Instant::now();
-        
+
         log::info!(
             "Executing scaling decision: {:?} from {} to {} workers",
             decision.decision_type,
@@ -439,27 +503,37 @@ impl AutoScaler {
                 let workers_to_add = decision.to_workers - decision.from_workers;
                 log::info!("Simulating addition of {} workers", workers_to_add);
                 // Simulate time for workers to start up
-                tokio::time::sleep(tokio::time::Duration::from_millis(500 * workers_to_add as u64)).await;
-            },
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    500 * workers_to_add as u64,
+                ))
+                .await;
+            }
             ScalingDecisionType::ScaleDown => {
                 let workers_to_remove = decision.from_workers - decision.to_workers;
                 log::info!("Simulating removal of {} workers", workers_to_remove);
                 // Simulate time for graceful shutdown
-                tokio::time::sleep(tokio::time::Duration::from_millis(200 * workers_to_remove as u64)).await;
-            },
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    200 * workers_to_remove as u64,
+                ))
+                .await;
+            }
             ScalingDecisionType::Emergency => {
                 log::warn!("Executing emergency scaling to maximum capacity");
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            },
+            }
             _ => {}
         }
         Ok(())
     }
 
     /// Update resource allocation after scaling
-    fn update_resource_allocation(&self, new_worker_count: usize, execution_time_ms: u64) -> Result<()> {
+    fn update_resource_allocation(
+        &self,
+        new_worker_count: usize,
+        execution_time_ms: u64,
+    ) -> Result<()> {
         let mut resources = self.current_resources.lock().unwrap();
-        
+
         resources.worker_count = new_worker_count;
         resources.total_cpu_cores = new_worker_count * resources.cpu_cores_per_worker;
         resources.total_memory_gb = new_worker_count * resources.memory_gb_per_worker;
@@ -480,7 +554,7 @@ impl AutoScaler {
     fn record_scaling_decision(&self, decision: ScalingDecision) {
         let mut decisions = self.scaling_decisions.lock().unwrap();
         decisions.push_back(decision);
-        
+
         // Keep only the last 100 decisions
         if decisions.len() > 100 {
             decisions.pop_front();
@@ -562,28 +636,61 @@ impl AutoScaler {
         10.0 + (rand::random::<f64>() * 50.0)
     }
 
-    fn evaluate_condition(&self, condition: &ScalingCondition, collector: &MetricsCollector) -> Result<bool> {
+    fn evaluate_condition(
+        &self,
+        condition: &ScalingCondition,
+        collector: &MetricsCollector,
+    ) -> Result<bool> {
         match condition {
-            ScalingCondition::CpuThreshold { threshold, duration_seconds } => {
-                Ok(collector.check_threshold(&collector.cpu_usage_history, *threshold, *duration_seconds))
-            },
-            ScalingCondition::MemoryThreshold { threshold, duration_seconds } => {
-                Ok(collector.check_threshold(&collector.memory_usage_history, *threshold, *duration_seconds))
-            },
-            ScalingCondition::QueueDepthThreshold { threshold, duration_seconds } => {
-                Ok(collector.check_threshold(&collector.queue_depth_history, *threshold as f64, *duration_seconds))
-            },
-            ScalingCondition::ResponseTimeThreshold { threshold_ms, duration_seconds } => {
-                Ok(collector.check_threshold(&collector.response_time_history, *threshold_ms as f64, *duration_seconds))
-            },
-            ScalingCondition::ErrorRateThreshold { threshold, duration_seconds } => {
-                Ok(collector.check_threshold(&collector.error_rate_history, *threshold, *duration_seconds))
-            },
+            ScalingCondition::CpuThreshold {
+                threshold,
+                duration_seconds,
+            } => Ok(collector.check_threshold(
+                &collector.cpu_usage_history,
+                *threshold,
+                *duration_seconds,
+            )),
+            ScalingCondition::MemoryThreshold {
+                threshold,
+                duration_seconds,
+            } => Ok(collector.check_threshold(
+                &collector.memory_usage_history,
+                *threshold,
+                *duration_seconds,
+            )),
+            ScalingCondition::QueueDepthThreshold {
+                threshold,
+                duration_seconds,
+            } => Ok(collector.check_threshold(
+                &collector.queue_depth_history,
+                *threshold as f64,
+                *duration_seconds,
+            )),
+            ScalingCondition::ResponseTimeThreshold {
+                threshold_ms,
+                duration_seconds,
+            } => Ok(collector.check_threshold(
+                &collector.response_time_history,
+                *threshold_ms as f64,
+                *duration_seconds,
+            )),
+            ScalingCondition::ErrorRateThreshold {
+                threshold,
+                duration_seconds,
+            } => Ok(collector.check_threshold(
+                &collector.error_rate_history,
+                *threshold,
+                *duration_seconds,
+            )),
             _ => Ok(false), // TODO: Implement other conditions
         }
     }
 
-    fn populate_trigger_metrics(&self, metrics: &mut HashMap<String, f64>, collector: &MetricsCollector) {
+    fn populate_trigger_metrics(
+        &self,
+        metrics: &mut HashMap<String, f64>,
+        collector: &MetricsCollector,
+    ) {
         if let Some(cpu) = collector.cpu_usage_history.back() {
             metrics.insert("cpu_usage".to_string(), cpu.value);
         }
@@ -609,9 +716,19 @@ impl MetricsCollector {
         }
     }
 
-    fn add_metric(&mut self, metric_type: &str, value: f64, timestamp: DateTime<Utc>, source: String) {
-        let point = MetricPoint { timestamp, value, source };
-        
+    fn add_metric(
+        &mut self,
+        metric_type: &str,
+        value: f64,
+        timestamp: DateTime<Utc>,
+        source: String,
+    ) {
+        let point = MetricPoint {
+            timestamp,
+            value,
+            source,
+        };
+
         let history = match metric_type {
             "cpu" => &mut self.cpu_usage_history,
             "memory" => &mut self.memory_usage_history,
@@ -623,15 +740,20 @@ impl MetricsCollector {
         };
 
         history.push_back(point);
-        
+
         if history.len() > self.max_history_size {
             history.pop_front();
         }
     }
 
-    fn check_threshold(&self, history: &VecDeque<MetricPoint>, threshold: f64, duration_seconds: u64) -> bool {
+    fn check_threshold(
+        &self,
+        history: &VecDeque<MetricPoint>,
+        threshold: f64,
+        duration_seconds: u64,
+    ) -> bool {
         let cutoff_time = Utc::now() - Duration::seconds(duration_seconds as i64);
-        
+
         let recent_values: Vec<f64> = history
             .iter()
             .filter(|point| point.timestamp > cutoff_time)
@@ -649,7 +771,7 @@ impl MetricsCollector {
 
     fn calculate_trend(&self, history: &VecDeque<MetricPoint>, duration: Duration) -> f64 {
         let cutoff_time = Utc::now() - duration;
-        
+
         let recent_values: Vec<(i64, f64)> = history
             .iter()
             .filter(|point| point.timestamp > cutoff_time)
@@ -667,8 +789,9 @@ impl MetricsCollector {
         let sum_xy: f64 = recent_values.iter().map(|(x, y)| (*x as f64) * y).sum();
         let sum_x2: i64 = recent_values.iter().map(|(x, _)| x * x).sum();
 
-        let slope = (n * sum_xy - (sum_x as f64) * sum_y) / (n * (sum_x2 as f64) - (sum_x as f64).powi(2));
-        
+        let slope =
+            (n * sum_xy - (sum_x as f64) * sum_y) / (n * (sum_x2 as f64) - (sum_x as f64).powi(2));
+
         // Normalize to percentage change per hour
         slope / (sum_y / n) * 3600.0
     }
@@ -681,16 +804,24 @@ pub async fn get_scaling_status(scaler: &AutoScaler) -> Result<ScalingStatus> {
     let metrics = scaler.metrics_collector.lock().unwrap();
 
     let recent_decisions: Vec<_> = decisions.iter().rev().take(5).cloned().collect();
-    
-    let current_cpu = metrics.cpu_usage_history.back().map(|m| m.value).unwrap_or(0.0);
-    let current_memory = metrics.memory_usage_history.back().map(|m| m.value).unwrap_or(0.0);
+
+    let current_cpu = metrics
+        .cpu_usage_history
+        .back()
+        .map(|m| m.value)
+        .unwrap_or(0.0);
+    let current_memory = metrics
+        .memory_usage_history
+        .back()
+        .map(|m| m.value)
+        .unwrap_or(0.0);
 
     let mut recommendations = Vec::new();
-    
+
     if current_cpu > 85.0 {
         recommendations.push("Consider increasing CPU threshold or max workers".to_string());
     }
-    
+
     if resources.worker_count >= scaler.config.max_workers {
         recommendations.push("At maximum capacity - consider increasing max_workers".to_string());
     }
@@ -733,13 +864,13 @@ mod tests {
     fn test_metrics_collector() {
         let mut collector = MetricsCollector::new();
         let now = Utc::now();
-        
+
         collector.add_metric("cpu", 75.0, now, "system".to_string());
         collector.add_metric("memory", 60.0, now, "system".to_string());
-        
+
         assert_eq!(collector.cpu_usage_history.len(), 1);
         assert_eq!(collector.memory_usage_history.len(), 1);
-        
+
         let threshold_exceeded = collector.check_threshold(&collector.cpu_usage_history, 70.0, 60);
         assert!(threshold_exceeded);
     }
@@ -748,7 +879,7 @@ mod tests {
     async fn test_auto_scaler_creation() {
         let config = ScalingConfig::default();
         let scaler = AutoScaler::new(config);
-        
+
         let resources = scaler.current_resources.lock().unwrap();
         assert_eq!(resources.worker_count, 2); // min_workers
     }

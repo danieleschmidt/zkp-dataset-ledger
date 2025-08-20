@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use zkp_dataset_ledger::{
     research::{
         breakthrough_algorithms::{run_breakthrough_benchmarks, StreamingConfig},
-        mod_research::{ResearchConfig, ResearchExperiment, generate_research_report},
-        optimization::{OptimizationConfig, ZkOptimizationEngine, CircuitOptimizationLevel},
+        mod_research::{generate_research_report, ResearchConfig, ResearchExperiment},
+        optimization::{CircuitOptimizationLevel, OptimizationConfig, ZkOptimizationEngine},
     },
     Dataset, Ledger, ProofConfig,
 };
@@ -23,11 +23,11 @@ use zkp_dataset_ledger::{
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    
+
     /// Enable verbose output
     #[arg(short, long)]
     verbose: bool,
-    
+
     /// Configuration file path
     #[arg(short, long)]
     config: Option<PathBuf>,
@@ -40,86 +40,86 @@ enum Commands {
         /// Dataset path
         #[arg(short, long)]
         dataset: PathBuf,
-        
+
         /// Output results to file
         #[arg(short, long)]
         output: Option<PathBuf>,
-        
+
         /// Number of iterations for statistical significance
         #[arg(long, default_value = "1000")]
         iterations: usize,
     },
-    
+
     /// Execute comprehensive research study comparing algorithms
     Research {
         /// Datasets directory
         #[arg(short, long)]
         datasets: PathBuf,
-        
+
         /// Research configuration file
         #[arg(short, long)]
         config: Option<PathBuf>,
-        
+
         /// Generate publication-ready report
         #[arg(long)]
         publish: bool,
     },
-    
+
     /// Test streaming ZKP for large datasets
     Streaming {
         /// Large dataset path
         #[arg(short, long)]
         dataset: PathBuf,
-        
+
         /// Chunk size for streaming (bytes)
         #[arg(long, default_value = "1000000")]
         chunk_size: usize,
-        
+
         /// Enable real-time verification
         #[arg(long)]
         realtime: bool,
     },
-    
+
     /// Generate post-quantum secure proofs
     PostQuantum {
         /// Dataset path
         #[arg(short, long)]
         dataset: PathBuf,
-        
+
         /// Security level (128, 192, 256)
         #[arg(long, default_value = "128")]
         security_level: u32,
-        
+
         /// Output proof file
         #[arg(short, long)]
         output: PathBuf,
     },
-    
+
     /// Run optimization engine comparison
     Optimize {
         /// Dataset path
         #[arg(short, long)]
         dataset: PathBuf,
-        
+
         /// Optimization level (none, basic, advanced, aggressive)
         #[arg(long, default_value = "advanced")]
         level: String,
-        
+
         /// Enable proof compression
         #[arg(long)]
         compress: bool,
     },
-    
+
     /// Comprehensive research validation
     Validate {
         /// Research results directory
         #[arg(short, long)]
         results_dir: PathBuf,
-        
+
         /// Statistical significance threshold
         #[arg(long, default_value = "0.05")]
         alpha: f64,
-        
+
         /// Generate validation report
         #[arg(long)]
         report: bool,
@@ -128,31 +128,55 @@ enum Commands {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    
+
     let cli = Cli::parse();
-    
+
     if cli.verbose {
         println!("🧪 ZKP Dataset Ledger - Advanced Research CLI");
         println!("   Implementing breakthrough cryptographic algorithms");
     }
 
     match cli.command {
-        Commands::Benchmark { dataset, output, iterations } => {
+        Commands::Benchmark {
+            dataset,
+            output,
+            iterations,
+        } => {
             run_benchmark_command(dataset, output, iterations, cli.verbose)?;
         }
-        Commands::Research { datasets, config, publish } => {
+        Commands::Research {
+            datasets,
+            config,
+            publish,
+        } => {
             run_research_command(datasets, config, publish, cli.verbose)?;
         }
-        Commands::Streaming { dataset, chunk_size, realtime } => {
+        Commands::Streaming {
+            dataset,
+            chunk_size,
+            realtime,
+        } => {
             run_streaming_command(dataset, chunk_size, realtime, cli.verbose)?;
         }
-        Commands::PostQuantum { dataset, security_level, output } => {
+        Commands::PostQuantum {
+            dataset,
+            security_level,
+            output,
+        } => {
             run_post_quantum_command(dataset, security_level, output, cli.verbose)?;
         }
-        Commands::Optimize { dataset, level, compress } => {
+        Commands::Optimize {
+            dataset,
+            level,
+            compress,
+        } => {
             run_optimization_command(dataset, level, compress, cli.verbose)?;
         }
-        Commands::Validate { results_dir, alpha, report } => {
+        Commands::Validate {
+            results_dir,
+            alpha,
+            report,
+        } => {
             run_validation_command(results_dir, alpha, report, cli.verbose)?;
         }
     }
@@ -174,7 +198,7 @@ fn run_benchmark_command(
 
     // Load dataset
     let dataset = Dataset::from_path(&dataset_path)?;
-    
+
     if verbose {
         println!("📊 Dataset loaded:");
         println!("   Size: {} bytes", dataset.size);
@@ -184,15 +208,27 @@ fn run_benchmark_command(
 
     // Run breakthrough benchmarks
     let results = run_breakthrough_benchmarks(&dataset)?;
-    
+
     // Display results
     println!("\n🎯 Breakthrough Algorithm Results:");
-    println!("   ⚡ Adaptive Polynomial: {}ms", results.adaptive_polynomial_ms);
+    println!(
+        "   ⚡ Adaptive Polynomial: {}ms",
+        results.adaptive_polynomial_ms
+    );
     println!("   🌊 Streaming ZKP: {}ms", results.streaming_zkp_ms);
     println!("   🔐 Post-Quantum: {}ms", results.post_quantum_ms);
-    println!("   📈 Performance Improvement: {:.1}%", results.performance_improvement * 100.0);
-    println!("   🗜️  Compression Improvement: {:.1}%", results.compression_improvement * 100.0);
-    println!("   🛡️  Security Enhancement: {:.1}%", results.security_enhancement * 100.0);
+    println!(
+        "   📈 Performance Improvement: {:.1}%",
+        results.performance_improvement * 100.0
+    );
+    println!(
+        "   🗜️  Compression Improvement: {:.1}%",
+        results.compression_improvement * 100.0
+    );
+    println!(
+        "   🛡️  Security Enhancement: {:.1}%",
+        results.security_enhancement * 100.0
+    );
 
     // Save results if output path provided
     if let Some(output_path) = output {
@@ -231,10 +267,10 @@ fn run_research_command(
 
     // Initialize research experiment
     let mut experiment = ResearchExperiment::new(research_config);
-    
+
     // Load datasets from directory
     let dataset_count = load_datasets_from_directory(&mut experiment, &datasets_dir, verbose)?;
-    
+
     if verbose {
         println!("📚 Loaded {} datasets for research", dataset_count);
     }
@@ -242,41 +278,59 @@ fn run_research_command(
     // Run comprehensive comparative study
     println!("\n🧪 Executing comparative algorithm study...");
     let results = experiment.run_comparative_study()?;
-    
+
     // Generate research report
     let report = generate_research_report(&results);
-    
+
     if publish {
         // Save publication-ready report
-        let report_path = format!("research_report_{}.md", 
-            chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let report_path = format!(
+            "research_report_{}.md",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         std::fs::write(&report_path, &report)?;
-        
+
         println!("📝 Publication-ready report generated: {}", report_path);
-        
+
         // Also save raw data for peer review
-        let data_path = format!("research_data_{}.json", 
-            chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let data_path = format!(
+            "research_data_{}.json",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         let json_data = serde_json::to_string_pretty(&results)?;
         std::fs::write(&data_path, json_data)?;
-        
+
         println!("📊 Raw research data saved: {}", data_path);
     } else {
         // Display summary results
         println!("\n📋 Research Summary:");
         if results.statistical_significance < 0.05 {
-            println!("   ✅ STATISTICALLY SIGNIFICANT RESULTS (p = {:.6})", results.statistical_significance);
+            println!(
+                "   ✅ STATISTICALLY SIGNIFICANT RESULTS (p = {:.6})",
+                results.statistical_significance
+            );
         } else {
-            println!("   ⚠️  Not statistically significant (p = {:.6})", results.statistical_significance);
+            println!(
+                "   ⚠️  Not statistically significant (p = {:.6})",
+                results.statistical_significance
+            );
         }
-        
-        println!("   🏃 Baseline Mean: {:.2}ms", results.baseline_performance.mean);
-        println!("   🚀 Novel Approach Mean: {:.2}ms", results.novel_approach_performance.mean);
-        
-        let improvement = ((results.baseline_performance.mean - results.novel_approach_performance.mean) 
-            / results.baseline_performance.mean) * 100.0;
+
+        println!(
+            "   🏃 Baseline Mean: {:.2}ms",
+            results.baseline_performance.mean
+        );
+        println!(
+            "   🚀 Novel Approach Mean: {:.2}ms",
+            results.novel_approach_performance.mean
+        );
+
+        let improvement = ((results.baseline_performance.mean
+            - results.novel_approach_performance.mean)
+            / results.baseline_performance.mean)
+            * 100.0;
         println!("   📈 Performance Improvement: {:.1}%", improvement);
-        
+
         println!("\n💡 Key Recommendations:");
         for (i, rec) in results.recommendations.iter().enumerate() {
             println!("   {}. {}", i + 1, rec);
@@ -301,7 +355,7 @@ fn run_streaming_command(
 
     // Load dataset
     let dataset = Dataset::from_path(&dataset_path)?;
-    
+
     // Create streaming configuration
     let streaming_config = StreamingConfig {
         chunk_size,
@@ -314,36 +368,44 @@ fn run_streaming_command(
     if verbose {
         println!("📊 Dataset Analysis:");
         println!("   Total size: {} bytes", dataset.size);
-        println!("   Estimated chunks: {}", (dataset.size as usize + chunk_size - 1) / chunk_size);
-        println!("   Parallelism level: {}", streaming_config.parallelism_level);
+        println!(
+            "   Estimated chunks: {}",
+            (dataset.size as usize + chunk_size - 1) / chunk_size
+        );
+        println!(
+            "   Parallelism level: {}",
+            streaming_config.parallelism_level
+        );
     }
 
     // Create streaming circuit
     println!("\n🔧 Initializing streaming ZKP circuit...");
     let start_time = std::time::Instant::now();
-    let _streaming_circuit = zkp_dataset_ledger::research::breakthrough_algorithms::StreamingZKPCircuit::new(
-        &dataset, 
-        streaming_config
-    )?;
+    let _streaming_circuit =
+        zkp_dataset_ledger::research::breakthrough_algorithms::StreamingZKPCircuit::new(
+            &dataset,
+            streaming_config,
+        )?;
     let setup_time = start_time.elapsed();
 
     println!("✅ Streaming circuit initialized in {:?}", setup_time);
-    
+
     if realtime {
         println!("🚀 Real-time streaming validation simulation:");
-        
+
         // Simulate streaming validation
         let total_chunks = (dataset.size as usize + chunk_size - 1) / chunk_size;
-        for i in 0..total_chunks.min(10) { // Demo first 10 chunks
+        for i in 0..total_chunks.min(10) {
+            // Demo first 10 chunks
             let chunk_start = std::time::Instant::now();
-            
+
             // Simulate chunk processing
             std::thread::sleep(std::time::Duration::from_millis(5));
-            
+
             let chunk_time = chunk_start.elapsed();
             println!("   Chunk {}: validated in {:?}", i + 1, chunk_time);
         }
-        
+
         if total_chunks > 10 {
             println!("   ... ({} more chunks processed)", total_chunks - 10);
         }
@@ -351,9 +413,11 @@ fn run_streaming_command(
 
     println!("\n🎯 Streaming Performance:");
     println!("   Setup time: {:?}", setup_time);
-    println!("   Estimated throughput: {:.2} MB/s", 
-        (dataset.size as f64 / 1_000_000.0) / setup_time.as_secs_f64());
-    
+    println!(
+        "   Estimated throughput: {:.2} MB/s",
+        (dataset.size as f64 / 1_000_000.0) / setup_time.as_secs_f64()
+    );
+
     if realtime {
         println!("   Real-time verification: ✅ ENABLED");
         println!("   Incremental updates: ✅ SUPPORTED");
@@ -382,18 +446,19 @@ fn run_post_quantum_command(
 
     // Load dataset
     let dataset = Dataset::from_path(&dataset_path)?;
-    
+
     println!("🧮 Creating post-quantum circuit...");
     let circuit_start = std::time::Instant::now();
-    
+
     // Create post-quantum circuit
-    let pq_circuit = zkp_dataset_ledger::research::breakthrough_algorithms::PostQuantumCircuit::new(
-        &dataset, 
-        security_level
-    )?;
-    
+    let pq_circuit =
+        zkp_dataset_ledger::research::breakthrough_algorithms::PostQuantumCircuit::new(
+            &dataset,
+            security_level,
+        )?;
+
     let circuit_time = circuit_start.elapsed();
-    
+
     if verbose {
         println!("   Lattice dimension: {}", pq_circuit.dimension);
         println!("   Circuit setup: {:?}", circuit_time);
@@ -401,14 +466,14 @@ fn run_post_quantum_command(
 
     println!("⚡ Generating quantum-resistant proof...");
     let proof_start = std::time::Instant::now();
-    
+
     // Simulate proof generation (would use actual PQ proof system)
     std::thread::sleep(std::time::Duration::from_millis(
-        1000 + (security_level as u64 - 128) * 10
+        1000 + (security_level as u64 - 128) * 10,
     ));
-    
+
     let proof_time = proof_start.elapsed();
-    
+
     // Create proof metadata
     let proof_metadata = serde_json::json!({
         "algorithm": "lattice_based_zkp",
@@ -427,7 +492,7 @@ fn run_post_quantum_command(
 
     // Save proof to file
     std::fs::write(&output_path, serde_json::to_string_pretty(&proof_metadata)?)?;
-    
+
     println!("✅ Post-quantum proof generated successfully!");
     println!("   Generation time: {:?}", proof_time);
     println!("   Quantum resistance: ✅ GUARANTEED");
@@ -455,12 +520,14 @@ fn run_optimization_command(
         "basic" => CircuitOptimizationLevel::Basic,
         "advanced" => CircuitOptimizationLevel::Advanced,
         "aggressive" => CircuitOptimizationLevel::Aggressive,
-        _ => return Err("Invalid optimization level. Use: none, basic, advanced, aggressive".into()),
+        _ => {
+            return Err("Invalid optimization level. Use: none, basic, advanced, aggressive".into())
+        }
     };
 
     // Load dataset
     let dataset = Dataset::from_path(&dataset_path)?;
-    
+
     // Create optimization configuration
     let opt_config = OptimizationConfig {
         enable_parallel_circuits: true,
@@ -476,7 +543,7 @@ fn run_optimization_command(
     let proof_config = ProofConfig::default();
 
     println!("🔧 Optimizing proof generation...");
-    
+
     // Run optimization
     let start_time = std::time::Instant::now();
     let optimized_proof = engine.optimize_proof_generation(&dataset, &proof_config)?;
@@ -484,12 +551,28 @@ fn run_optimization_command(
 
     // Display results
     println!("\n📊 Optimization Results:");
-    println!("   ⚡ Generation time: {}ms", optimized_proof.generation_time_ms);
-    println!("   🎯 Cache hit: {}", if optimized_proof.cache_hit { "✅" } else { "❌" });
+    println!(
+        "   ⚡ Generation time: {}ms",
+        optimized_proof.generation_time_ms
+    );
+    println!(
+        "   🎯 Cache hit: {}",
+        if optimized_proof.cache_hit {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
     println!("   📏 Proof size: {} bytes", optimized_proof.size_bytes());
-    println!("   🚀 Speedup: {:.2}x", optimized_proof.optimization_info.estimated_speedup);
-    println!("   💾 Memory reduction: {:.1}%", optimized_proof.optimization_info.memory_reduction * 100.0);
-    
+    println!(
+        "   🚀 Speedup: {:.2}x",
+        optimized_proof.optimization_info.estimated_speedup
+    );
+    println!(
+        "   💾 Memory reduction: {:.1}%",
+        optimized_proof.optimization_info.memory_reduction * 100.0
+    );
+
     println!("\n🔧 Optimizations Applied:");
     for opt in &optimized_proof.optimization_info.optimization_applied {
         println!("   • {}", opt);
@@ -499,25 +582,38 @@ fn run_optimization_command(
     println!("\n🔄 Testing batch optimization...");
     let datasets = vec![dataset.clone(), dataset.clone(), dataset];
     let configs = vec![proof_config.clone(), proof_config.clone(), proof_config];
-    
+
     let batch_start = std::time::Instant::now();
     let batch_proofs = engine.batch_optimize_proofs(&datasets, &configs)?;
     let batch_time = batch_start.elapsed();
-    
-    println!("   Batch processing: {} proofs in {:?}", batch_proofs.len(), batch_time);
-    println!("   Average time per proof: {:?}", batch_time / batch_proofs.len() as u32);
-    
+
+    println!(
+        "   Batch processing: {} proofs in {:?}",
+        batch_proofs.len(),
+        batch_time
+    );
+    println!(
+        "   Average time per proof: {:?}",
+        batch_time / batch_proofs.len() as u32
+    );
+
     // Show cache effectiveness
     let cache_hits = batch_proofs.iter().filter(|p| p.cache_hit).count();
-    println!("   Cache hits: {}/{} ({:.1}%)", 
-        cache_hits, batch_proofs.len(), 
-        (cache_hits as f64 / batch_proofs.len() as f64) * 100.0);
+    println!(
+        "   Cache hits: {}/{} ({:.1}%)",
+        cache_hits,
+        batch_proofs.len(),
+        (cache_hits as f64 / batch_proofs.len() as f64) * 100.0
+    );
 
     // Get engine statistics
     let stats = engine.get_optimization_stats();
     println!("\n📈 Engine Statistics:");
     println!("   Circuits optimized: {}", stats.total_circuits_optimized);
-    println!("   Total constraint reduction: {}", stats.total_constraint_reduction);
+    println!(
+        "   Total constraint reduction: {}",
+        stats.total_constraint_reduction
+    );
     println!("   Average speedup: {:.2}x", stats.average_speedup);
 
     Ok(())
@@ -537,7 +633,7 @@ fn run_validation_command(
 
     // For demo, create mock validation results
     println!("📊 Validating research results against statistical standards...");
-    
+
     // Simulate validation checks
     let checks = vec![
         ("Statistical significance", true, "p < 0.05"),
@@ -555,14 +651,22 @@ fn run_validation_command(
     }
 
     let all_passed = checks.iter().all(|(_, passed, _)| *passed);
-    
-    println!("\n🎯 Overall Validation: {}", 
-        if all_passed { "✅ RESEARCH VALID" } else { "❌ ISSUES FOUND" });
+
+    println!(
+        "\n🎯 Overall Validation: {}",
+        if all_passed {
+            "✅ RESEARCH VALID"
+        } else {
+            "❌ ISSUES FOUND"
+        }
+    );
 
     if report {
         let validation_report = generate_validation_report(&checks, alpha);
-        let report_path = format!("validation_report_{}.md", 
-            chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let report_path = format!(
+            "validation_report_{}.md",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         std::fs::write(&report_path, validation_report)?;
         println!("📝 Validation report saved: {}", report_path);
     }
@@ -576,7 +680,7 @@ fn load_datasets_from_directory(
     verbose: bool,
 ) -> Result<usize, Box<dyn std::error::Error>> {
     let mut count = 0;
-    
+
     // For demo, create a mock dataset since we might not have real files
     let mock_dataset = Dataset {
         name: "research_dataset".to_string(),
@@ -589,10 +693,10 @@ fn load_datasets_from_directory(
         format: zkp_dataset_ledger::DatasetFormat::Csv,
         path: Some(datasets_dir.to_string_lossy().to_string()),
     };
-    
+
     experiment.add_dataset(mock_dataset);
     count += 1;
-    
+
     if verbose {
         println!("📁 Loaded mock dataset for research demonstration");
     }
@@ -600,25 +704,25 @@ fn load_datasets_from_directory(
     Ok(count)
 }
 
-fn generate_validation_report(
-    checks: &[(String, bool, String)],
-    alpha: f64,
-) -> String {
+fn generate_validation_report(checks: &[(String, bool, String)], alpha: f64) -> String {
     let mut report = String::new();
-    
+
     report.push_str("# Research Validation Report\n\n");
-    report.push_str(&format!("**Generated:** {}\n", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")));
+    report.push_str(&format!(
+        "**Generated:** {}\n",
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+    ));
     report.push_str(&format!("**Significance Level (α):** {}\n\n", alpha));
-    
+
     report.push_str("## Validation Checks\n\n");
-    
+
     for (check, passed, details) in checks {
         let status = if *passed { "✅ PASS" } else { "❌ FAIL" };
         report.push_str(&format!("- **{}**: {} - {}\n", check, status, details));
     }
-    
+
     let all_passed = checks.iter().all(|(_, passed, _)| *passed);
-    
+
     report.push_str("\n## Overall Assessment\n\n");
     if all_passed {
         report.push_str("✅ **RESEARCH VALIDATED** - All validation checks passed.\n\n");
@@ -627,14 +731,18 @@ fn generate_validation_report(
         report.push_str("- Reproducibility\n");
         report.push_str("- Methodological soundness\n");
         report.push_str("- Data quality\n\n");
-        report.push_str("**Recommendation:** Results are suitable for publication and peer review.\n");
+        report.push_str(
+            "**Recommendation:** Results are suitable for publication and peer review.\n",
+        );
     } else {
         report.push_str("❌ **VALIDATION ISSUES FOUND** - Some checks failed.\n\n");
-        report.push_str("**Recommendation:** Address failing validation checks before publication.\n");
+        report.push_str(
+            "**Recommendation:** Address failing validation checks before publication.\n",
+        );
     }
-    
+
     report.push_str("\n---\n\n");
     report.push_str("*Generated by ZKP Dataset Ledger Research Validation Module*\n");
-    
+
     report
 }

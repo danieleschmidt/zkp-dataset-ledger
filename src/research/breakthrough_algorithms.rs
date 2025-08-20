@@ -11,9 +11,9 @@ use crate::{Dataset, LedgerError, Result};
 use ark_ff::{Field, One, Zero};
 use ark_r1cs_std::prelude::*;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use rayon::prelude::*;
 
 /// Novel adaptive proof generation with dynamic optimization
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,10 +32,7 @@ pub enum AlgorithmType {
         compression_ratio: f64,
     },
     /// Lattice-based post-quantum proofs
-    PostQuantumLattice {
-        dimension: usize,
-        noise_bound: f64,
-    },
+    PostQuantumLattice { dimension: usize, noise_bound: f64 },
     /// Streaming validation with incremental verification
     StreamingIncremental {
         chunk_size: usize,
@@ -51,10 +48,10 @@ pub enum AlgorithmType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OptimizationLevel {
-    Research,    // Experimental optimizations
-    Production,  // Stable optimizations  
-    Balanced,    // Balance between speed and security
-    Security,    // Maximum security, slower
+    Research,   // Experimental optimizations
+    Production, // Stable optimizations
+    Balanced,   // Balance between speed and security
+    Security,   // Maximum security, slower
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,9 +145,8 @@ pub struct StreamingSecurity {
 impl ConstraintSynthesizer<Fr> for StreamingZKPCircuit {
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         // Allocate incremental state as public input
-        let accumulated_hash_var = FpVar::new_input(cs.clone(), || {
-            Ok(self.incremental_state.accumulated_hash)
-        })?;
+        let accumulated_hash_var =
+            FpVar::new_input(cs.clone(), || Ok(self.incremental_state.accumulated_hash))?;
 
         let total_size_var = FpVar::new_input(cs.clone(), || {
             Ok(Fr::from(self.incremental_state.total_size))
@@ -169,17 +165,20 @@ impl ConstraintSynthesizer<Fr> for StreamingZKPCircuit {
             for chunk in chunk_batch {
                 // Allocate private chunk data
                 let chunk_hash_var = FpVar::new_witness(cs.clone(), || Ok(chunk.data_hash))?;
-                let chunk_size_var = FpVar::new_witness(cs.clone(), || {
-                    Ok(Fr::from(chunk.size as u64))
-                })?;
+                let chunk_size_var =
+                    FpVar::new_witness(cs.clone(), || Ok(Fr::from(chunk.size as u64)))?;
 
                 // Quality constraints - ensure each chunk meets quality thresholds
                 let quality_var = FpVar::new_witness(cs.clone(), || {
-                    Ok(Fr::from((chunk.quality_metrics.completeness * 1000.0) as u64))
+                    Ok(Fr::from(
+                        (chunk.quality_metrics.completeness * 1000.0) as u64,
+                    ))
                 })?;
 
                 let quality_threshold_var = FpVar::new_input(cs.clone(), || {
-                    Ok(Fr::from((self.adaptive_params.quality_threshold * 1000.0) as u64))
+                    Ok(Fr::from(
+                        (self.adaptive_params.quality_threshold * 1000.0) as u64,
+                    ))
                 })?;
 
                 // Constraint: Quality must exceed threshold
@@ -203,7 +202,9 @@ impl ConstraintSynthesizer<Fr> for StreamingZKPCircuit {
                     })?;
 
                     let min_compression_var = FpVar::new_input(cs.clone(), || {
-                        Ok(Fr::from((self.adaptive_params.compression_threshold * 1000.0) as u64))
+                        Ok(Fr::from(
+                            (self.adaptive_params.compression_threshold * 1000.0) as u64,
+                        ))
                     })?;
 
                     // Constraint: Compression ratio must be reasonable
@@ -294,10 +295,8 @@ impl StreamingZKPCircuit {
         let chunks: Vec<StreamChunk> = (0..total_chunks)
             .into_par_iter()
             .map(|i| {
-                let current_chunk_size = std::cmp::min(
-                    chunk_size,
-                    dataset.size as usize - i * chunk_size
-                );
+                let current_chunk_size =
+                    std::cmp::min(chunk_size, dataset.size as usize - i * chunk_size);
 
                 // Simulate advanced hash computation
                 let data_hash = Fr::from((i + 1) as u64 * 31337); // High-quality hash
@@ -356,21 +355,25 @@ impl StreamingZKPCircuit {
             1
         };
 
-        let complexity_factor = if let (Some(rows), Some(cols)) = (dataset.row_count, dataset.column_count) {
-            if rows * cols > 10_000_000 {
-                2 // Complex datasets need bigger batches
+        let complexity_factor =
+            if let (Some(rows), Some(cols)) = (dataset.row_count, dataset.column_count) {
+                if rows * cols > 10_000_000 {
+                    2 // Complex datasets need bigger batches
+                } else {
+                    1
+                }
             } else {
                 1
-            }
-        } else {
-            1
-        };
+            };
 
         (base_batch_size * size_factor * complexity_factor).min(cpu_count * 8)
     }
 
     /// Compute incremental hash with security guarantees
-    fn compute_incremental_hash(&self, chunk_hash: &FpVar<Fr>) -> Result<FpVar<Fr>, SynthesisError> {
+    fn compute_incremental_hash(
+        &self,
+        chunk_hash: &FpVar<Fr>,
+    ) -> Result<FpVar<Fr>, SynthesisError> {
         // Advanced hash chaining with security properties
         let mut result = chunk_hash.clone();
 
@@ -389,28 +392,30 @@ impl StreamingZKPCircuit {
     }
 
     /// Enforce statistical consistency constraints
-    fn enforce_statistical_constraints(&self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
+    fn enforce_statistical_constraints(
+        &self,
+        cs: ConstraintSystemRef<Fr>,
+    ) -> Result<(), SynthesisError> {
         // Quality variance constraint
         let quality_variance_var = FpVar::new_input(cs.clone(), || {
-            Ok(Fr::from((self.incremental_state.quality_accumulator.running_variance * 1000.0) as u64))
+            Ok(Fr::from(
+                (self.incremental_state.quality_accumulator.running_variance * 1000.0) as u64,
+            ))
         })?;
 
         let max_variance_var = FpVar::constant(Fr::from(100u64)); // Max allowed variance
 
-        let variance_check = quality_variance_var.is_cmp(
-            &max_variance_var,
-            std::cmp::Ordering::Less,
-            false,
-        )?;
+        let variance_check =
+            quality_variance_var.is_cmp(&max_variance_var, std::cmp::Ordering::Less, false)?;
         variance_check.enforce_equal(&Boolean::TRUE)?;
 
         // Chunk count consistency
-        let expected_chunk_count = (self.incremental_state.total_size + 
-            self.adaptive_params.batch_size as u64 - 1) / self.adaptive_params.batch_size as u64;
-        
-        let chunk_count_var = FpVar::new_input(cs, || {
-            Ok(Fr::from(self.incremental_state.chunk_count))
-        })?;
+        let expected_chunk_count =
+            (self.incremental_state.total_size + self.adaptive_params.batch_size as u64 - 1)
+                / self.adaptive_params.batch_size as u64;
+
+        let chunk_count_var =
+            FpVar::new_input(cs, || Ok(Fr::from(self.incremental_state.chunk_count)))?;
 
         let expected_count_var = FpVar::constant(Fr::from(expected_chunk_count));
         chunk_count_var.enforce_equal(&expected_count_var)?;
@@ -471,7 +476,7 @@ impl ConstraintSynthesizer<Fr> for PostQuantumCircuit {
 
         // Lattice equation constraint: A * s + e = syndrome
         let mut computed_syndrome = FpVar::zero();
-        
+
         for (i, witness_var) in witness_vars.iter().enumerate() {
             if i < self.public_basis.len() {
                 let basis_var = FpVar::constant(self.public_basis[i]);
@@ -482,13 +487,10 @@ impl ConstraintSynthesizer<Fr> for PostQuantumCircuit {
 
         // Add error term (bounded)
         if let Some(last_witness) = witness_vars.last() {
-            let error_check = last_witness.is_cmp(
-                &error_bound_var,
-                std::cmp::Ordering::Less,
-                false,
-            )?;
+            let error_check =
+                last_witness.is_cmp(&error_bound_var, std::cmp::Ordering::Less, false)?;
             error_check.enforce_equal(&Boolean::TRUE)?;
-            
+
             computed_syndrome += last_witness;
         }
 
@@ -513,7 +515,7 @@ impl PostQuantumCircuit {
         // Generate lattice basis from dataset properties
         let mut public_basis = Vec::with_capacity(dimension);
         let dataset_seed = dataset.hash.as_bytes();
-        
+
         for i in 0..dimension {
             let val = ((i as u64).wrapping_mul(31337) + dataset.size) % 65537;
             public_basis.push(Fr::from(val));
@@ -556,10 +558,13 @@ pub fn run_breakthrough_benchmarks(dataset: &Dataset) -> Result<BreakthroughResu
 
     // Benchmark adaptive polynomial system
     let start = std::time::Instant::now();
-    let adaptive_system = AdaptiveProofSystem::new(dataset, AlgorithmType::AdaptivePolynomial {
-        batch_size: 64,
-        compression_ratio: 0.7,
-    })?;
+    let _adaptive_system = AdaptiveProofSystem::new(
+        dataset,
+        AlgorithmType::AdaptivePolynomial {
+            batch_size: 64,
+            compression_ratio: 0.7,
+        },
+    )?;
     results.adaptive_polynomial_ms = start.elapsed().as_millis() as u64;
 
     // Benchmark streaming ZKP
@@ -576,12 +581,21 @@ pub fn run_breakthrough_benchmarks(dataset: &Dataset) -> Result<BreakthroughResu
     // Calculate improvement metrics
     results.performance_improvement = calculate_performance_improvement(&results);
     results.compression_improvement = 0.4; // 40% better compression
-    results.security_enhancement = 0.3;    // 30% security boost
+    results.security_enhancement = 0.3; // 30% security boost
 
     println!("✅ Breakthrough benchmarks completed!");
-    println!("   📈 Performance improvement: {:.1}%", results.performance_improvement * 100.0);
-    println!("   🗜️  Compression improvement: {:.1}%", results.compression_improvement * 100.0);
-    println!("   🔒 Security enhancement: {:.1}%", results.security_enhancement * 100.0);
+    println!(
+        "   📈 Performance improvement: {:.1}%",
+        results.performance_improvement * 100.0
+    );
+    println!(
+        "   🗜️  Compression improvement: {:.1}%",
+        results.compression_improvement * 100.0
+    );
+    println!(
+        "   🔒 Security enhancement: {:.1}%",
+        results.security_enhancement * 100.0
+    );
 
     Ok(results)
 }
@@ -589,7 +603,7 @@ pub fn run_breakthrough_benchmarks(dataset: &Dataset) -> Result<BreakthroughResu
 impl AdaptiveProofSystem {
     pub fn new(dataset: &Dataset, algorithm_type: AlgorithmType) -> Result<Self> {
         let optimization_level = OptimizationLevel::Research;
-        
+
         let security_parameters = SecurityParameters {
             security_level: 128,
             quantum_resistance: matches!(algorithm_type, AlgorithmType::PostQuantumLattice { .. }),
@@ -599,7 +613,10 @@ impl AdaptiveProofSystem {
 
         // Simulate performance metrics based on algorithm type
         let performance_metrics = match &algorithm_type {
-            AlgorithmType::AdaptivePolynomial { batch_size, compression_ratio } => {
+            AlgorithmType::AdaptivePolynomial {
+                batch_size,
+                compression_ratio,
+            } => {
                 PerformanceMetrics {
                     proof_generation_ms: 1500 / (*batch_size / 32), // Faster with larger batches
                     verification_ms: 50,
@@ -609,26 +626,25 @@ impl AdaptiveProofSystem {
                     compression_ratio: *compression_ratio,
                 }
             }
-            AlgorithmType::PostQuantumLattice { dimension, .. } => {
-                PerformanceMetrics {
-                    proof_generation_ms: 3000 + (dimension / 10) as u64,
-                    verification_ms: 100,
-                    proof_size_bytes: 1024,
-                    memory_usage_mb: 256,
-                    throughput_ops_per_sec: 500.0,
-                    compression_ratio: 0.8,
-                }
-            }
-            AlgorithmType::StreamingIncremental { parallelization_factor, .. } => {
-                PerformanceMetrics {
-                    proof_generation_ms: 2000 / *parallelization_factor as u64,
-                    verification_ms: 75,
-                    proof_size_bytes: 512,
-                    memory_usage_mb: 64,
-                    throughput_ops_per_sec: 2000.0,
-                    compression_ratio: 0.9,
-                }
-            }
+            AlgorithmType::PostQuantumLattice { dimension, .. } => PerformanceMetrics {
+                proof_generation_ms: 3000 + (dimension / 10) as u64,
+                verification_ms: 100,
+                proof_size_bytes: 1024,
+                memory_usage_mb: 256,
+                throughput_ops_per_sec: 500.0,
+                compression_ratio: 0.8,
+            },
+            AlgorithmType::StreamingIncremental {
+                parallelization_factor,
+                ..
+            } => PerformanceMetrics {
+                proof_generation_ms: 2000 / *parallelization_factor as u64,
+                verification_ms: 75,
+                proof_size_bytes: 512,
+                memory_usage_mb: 64,
+                throughput_ops_per_sec: 2000.0,
+                compression_ratio: 0.9,
+            },
             AlgorithmType::HybridOptimized { .. } => {
                 PerformanceMetrics {
                     proof_generation_ms: 1200, // Best of both worlds
@@ -667,7 +683,10 @@ fn calculate_performance_improvement(results: &BreakthroughResults) -> f64 {
         results.adaptive_polynomial_ms,
         results.streaming_zkp_ms,
         results.post_quantum_ms,
-    ].iter().min().unwrap_or(&baseline as &u64) as &u64;
+    ]
+    .iter()
+    .min()
+    .unwrap_or(&baseline as &u64) as &u64;
 
     (baseline - *best_time as f64) / baseline
 }
@@ -700,7 +719,8 @@ mod tests {
                 batch_size: 64,
                 compression_ratio: 0.7,
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(system.security_parameters.security_level, 128);
         assert!(system.performance_metrics.compression_ratio > 0.5);
