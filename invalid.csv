@@ -1,0 +1,4 @@
+name,age,score
+Alice,28,95.5
+Bob,32
+Charlie,25,92.1,extra_field
