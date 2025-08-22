@@ -1,4 +1,16 @@
 {
+  "6a963b9c-233c-41d7-84cb-d3b6d78c61b0": {
+    "id": "6a963b9c-233c-41d7-84cb-d3b6d78c61b0",
+    "dataset_name": "employee-data-v2",
+    "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
+    "operation": "notarize(enhanced-integrity)",
+    "proof": {
+      "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
+      "proof_type": "enhanced-integrity",
+      "timestamp": "2025-08-21T22:16:20.346237416Z"
+    },
+    "timestamp": "2025-08-21T22:16:20.346304145Z"
+  },
   "43a3cc20-baae-4cf8-9d81-24a09705e8c3": {
     "id": "43a3cc20-baae-4cf8-9d81-24a09705e8c3",
     "dataset_name": "invalid-csv-test",
@@ -10,6 +22,18 @@
       "timestamp": "2025-08-21T22:18:58.374930539Z"
     },
     "timestamp": "2025-08-21T22:18:58.374946304Z"
+  },
+  "3569cccd-6d04-46d0-82ac-27f3fe3a928c": {
+    "id": "3569cccd-6d04-46d0-82ac-27f3fe3a928c",
+    "dataset_name": "employee-data-v1",
+    "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
+    "operation": "notarize(integrity-check)",
+    "proof": {
+      "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
+      "proof_type": "integrity-check",
+      "timestamp": "2025-08-21T22:14:30.833314079Z"
+    },
+    "timestamp": "2025-08-21T22:14:30.833364821Z"
   },
   "1045de5b-766b-438a-b445-476318bd4353": {
     "id": "1045de5b-766b-438a-b445-476318bd4353",
@@ -35,18 +59,6 @@
     },
     "timestamp": "2025-08-21T22:21:09.313836717Z"
   },
-  "d9445296-9dcb-4cc6-9dd5-3594e1704aef": {
-    "id": "d9445296-9dcb-4cc6-9dd5-3594e1704aef",
-    "dataset_name": "large-dataset-performance",
-    "dataset_hash": "c3d19917a5ce0ee3895d2f43389533343a2d57fceff34345642eeb2ff3fce218",
-    "operation": "notarize(parallel-optimized)",
-    "proof": {
-      "dataset_hash": "c3d19917a5ce0ee3895d2f43389533343a2d57fceff34345642eeb2ff3fce218",
-      "proof_type": "parallel-optimized",
-      "timestamp": "2025-08-21T22:21:52.975012786Z"
-    },
-    "timestamp": "2025-08-21T22:21:52.975029531Z"
-  },
   "7305844d-ea06-4449-aa07-e792aeef3c43": {
     "id": "7305844d-ea06-4449-aa07-e792aeef3c43",
     "dataset_name": "bad-csv-test",
@@ -58,29 +70,5 @@
       "timestamp": "2025-08-21T22:19:06.716775314Z"
     },
     "timestamp": "2025-08-21T22:19:06.716790363Z"
-  },
-  "6a963b9c-233c-41d7-84cb-d3b6d78c61b0": {
-    "id": "6a963b9c-233c-41d7-84cb-d3b6d78c61b0",
-    "dataset_name": "employee-data-v2",
-    "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
-    "operation": "notarize(enhanced-integrity)",
-    "proof": {
-      "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
-      "proof_type": "enhanced-integrity",
-      "timestamp": "2025-08-21T22:16:20.346237416Z"
-    },
-    "timestamp": "2025-08-21T22:16:20.346304145Z"
-  },
-  "3569cccd-6d04-46d0-82ac-27f3fe3a928c": {
-    "id": "3569cccd-6d04-46d0-82ac-27f3fe3a928c",
-    "dataset_name": "employee-data-v1",
-    "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
-    "operation": "notarize(integrity-check)",
-    "proof": {
-      "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
-      "proof_type": "integrity-check",
-      "timestamp": "2025-08-21T22:14:30.833314079Z"
-    },
-    "timestamp": "2025-08-21T22:14:30.833364821Z"
   }
 }

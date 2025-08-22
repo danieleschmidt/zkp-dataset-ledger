@@ -1,0 +1,14 @@
+{
+  "3569cccd-6d04-46d0-82ac-27f3fe3a928c": {
+    "id": "3569cccd-6d04-46d0-82ac-27f3fe3a928c",
+    "dataset_name": "employee-data-v1",
+    "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
+    "operation": "notarize(integrity-check)",
+    "proof": {
+      "dataset_hash": "adeb34b0a3f1b27503c0cb122266b37242a177fcf6328d764d4d603054e2dc95",
+      "proof_type": "integrity-check",
+      "timestamp": "2025-08-21T22:14:30.833314079Z"
+    },
+    "timestamp": "2025-08-21T22:14:30.833364821Z"
+  }
+}

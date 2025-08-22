@@ -1,6 +1,3 @@
-Looking at the merge conflict, I can see that the main difference is around the `Research` command - one side has it implemented but disabled with a TODO comment, while the other side has it completely commented out. I'll resolve this by keeping the cleaner commented-out version since the functionality is disabled anyway.
-
-```rust
 use clap::{Parser, Subcommand};
 use log::{debug, info};
 
@@ -89,7 +86,6 @@ enum Commands {
     //     #[arg(long)]
     //     output: Option<String>,
     // },
-
     /// Generate comprehensive audit report
     Audit {
         /// Dataset to audit
@@ -120,7 +116,7 @@ fn get_or_create_ledger(project: Option<String>) -> Result<Ledger> {
 }
 
 /// Create sample datasets for research and testing
-#[allow(dead_code)]  // TODO: Use for research functionality
+#[allow(dead_code)] // TODO: Use for research functionality
 fn create_sample_datasets() -> Result<Vec<Dataset>> {
     // use std::collections::HashMap;  // TODO: Use for metadata
     use zkp_dataset_ledger::{Dataset, DatasetFormat};
@@ -411,7 +407,6 @@ fn main() -> Result<()> {
         //     println!("   Type: {}, Iterations: {}", research_type, iterations);
         //     Ok(())
         // }
-
         Commands::Audit {
             dataset,
             format,
@@ -483,4 +478,3 @@ mod tests {
         assert!(cli.is_ok());
     }
 }
-```
