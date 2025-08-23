@@ -2,13 +2,13 @@
 //!
 //! A basic implementation for cryptographic ML pipeline auditing.
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use sha2::{Sha256, Digest};
-use std::sync::{Arc, RwLock};
 use dashmap::DashMap;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// Main result type for the library
 pub type Result<T> = std::result::Result<T, LedgerError>;
@@ -42,21 +42,25 @@ pub enum LedgerError {
     StorageError(String),
     #[error("Network error: {0}")]
     NetworkError(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl LedgerError {
     pub fn not_found(entity: &str, msg: impl Into<String>) -> Self {
         Self::NotFound(format!("{}: {}", entity, msg.into()))
     }
-    
+
     pub fn validation_error(msg: impl Into<String>) -> Self {
         Self::ValidationError(msg.into())
     }
-    
+
     pub fn security_violation(msg: impl Into<String>) -> Self {
         Self::SecurityViolation(msg.into())
     }
-    
+
     pub fn data_integrity_error(msg: impl Into<String>) -> Self {
         Self::DataIntegrityError(msg.into())
     }
@@ -109,45 +113,62 @@ impl Dataset {
     pub fn new(name: String, path: String) -> Result<Self> {
         // Input validation
         if name.is_empty() {
-            return Err(LedgerError::validation_error("Dataset name cannot be empty"));
+            return Err(LedgerError::validation_error(
+                "Dataset name cannot be empty",
+            ));
         }
-        
+
         if name.len() > 255 {
-            return Err(LedgerError::validation_error("Dataset name cannot exceed 255 characters"));
+            return Err(LedgerError::validation_error(
+                "Dataset name cannot exceed 255 characters",
+            ));
         }
-        
+
         // Validate name contains only safe characters
-        if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        if !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+        {
             return Err(LedgerError::validation_error("Dataset name can only contain alphanumeric characters, hyphens, underscores, and dots"));
         }
-        
+
         if path.is_empty() {
-            return Err(LedgerError::validation_error("Dataset path cannot be empty"));
+            return Err(LedgerError::validation_error(
+                "Dataset path cannot be empty",
+            ));
         }
-        
+
         // Check file exists and is readable
         if !std::path::Path::new(&path).exists() {
-            return Err(LedgerError::not_found("file", format!("Dataset file not found: {}", path)));
+            return Err(LedgerError::not_found(
+                "file",
+                format!("Dataset file not found: {}", path),
+            ));
         }
-        
+
         let metadata = std::fs::metadata(&path)?;
         let size = metadata.len();
-        
+
         // Validate file size (max 1GB for simple implementation)
         if size > 1_073_741_824 {
-            return Err(LedgerError::validation_error("Dataset file exceeds 1GB limit"));
+            return Err(LedgerError::validation_error(
+                "Dataset file exceeds 1GB limit",
+            ));
         }
-        
+
         // Try to analyze CSV for basic stats
         let (row_count, column_count) = if path.ends_with(".csv") {
             Self::analyze_csv(&path).unwrap_or((0, 0))
         } else {
             (0, 0)
         };
-        
+
         // Simple hash computation
-        let hash = format!("{:x}", Sha256::digest(format!("{}:{}", name, size).as_bytes()));
-        
+        let hash = format!(
+            "{:x}",
+            Sha256::digest(format!("{}:{}", name, size).as_bytes())
+        );
+
         let format = if path.ends_with(".csv") {
             DatasetFormat::Csv
         } else if path.ends_with(".json") {
@@ -168,97 +189,118 @@ impl Dataset {
             format,
         })
     }
-    
+
     pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         let path_str = path.as_ref().to_string_lossy().to_string();
-        let name = path.as_ref()
+        let name = path
+            .as_ref()
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-        
+
         Self::new(name, path_str)
     }
-    
+
     pub fn compute_hash(&self) -> String {
         self.hash.clone()
     }
-    
+
     fn analyze_csv(path: &str) -> Result<(u64, u64)> {
         let start_time = std::time::Instant::now();
-        
+
         let mut reader = csv::Reader::from_path(path)
             .map_err(|e| LedgerError::ValidationError(format!("Failed to read CSV file: {}", e)))?;
-        
-        let headers = reader.headers()
+
+        let headers = reader
+            .headers()
             .map_err(|e| LedgerError::ValidationError(format!("Invalid CSV headers: {}", e)))?;
-        
+
         let column_count = headers.len() as u64;
-        
+
         // Validate CSV has at least one column
         if column_count == 0 {
             return Err(LedgerError::validation_error("CSV file has no columns"));
         }
-        
+
         // For large files, use memory-mapped reading for better performance
         let file_size = std::fs::metadata(path)?.len();
-        
-        let row_count = if file_size > 10_000_000 { // > 10MB, use optimized approach
-            log::info!("Using optimized processing for large CSV file ({}MB)", file_size / 1_000_000);
+
+        let row_count = if file_size > 10_000_000 {
+            // > 10MB, use optimized approach
+            log::info!(
+                "Using optimized processing for large CSV file ({}MB)",
+                file_size / 1_000_000
+            );
             Self::analyze_large_csv(path, column_count)?
         } else {
             Self::analyze_small_csv(reader, column_count)?
         };
-        
+
         let duration = start_time.elapsed();
-        log::info!("CSV analysis completed in {:?}: {} rows, {} columns", 
-            duration, row_count, column_count);
-        
+        log::info!(
+            "CSV analysis completed in {:?}: {} rows, {} columns",
+            duration,
+            row_count,
+            column_count
+        );
+
         Ok((row_count, column_count))
     }
-    
+
     /// Optimized analysis for small CSV files
     fn analyze_small_csv(mut reader: csv::Reader<std::fs::File>, column_count: u64) -> Result<u64> {
         let mut row_count = 0u64;
-        
+
         for result in reader.records() {
             match result {
                 Ok(record) => {
                     // Validate record has correct number of fields
                     if record.len() != column_count as usize {
-                        return Err(LedgerError::validation_error(
-                            format!("Row {} has {} fields but expected {}", row_count + 1, record.len(), column_count)
-                        ));
+                        return Err(LedgerError::validation_error(format!(
+                            "Row {} has {} fields but expected {}",
+                            row_count + 1,
+                            record.len(),
+                            column_count
+                        )));
                     }
                     row_count += 1;
                 }
-                Err(e) => return Err(LedgerError::ValidationError(format!("Invalid CSV row {}: {}", row_count + 1, e))),
+                Err(e) => {
+                    return Err(LedgerError::ValidationError(format!(
+                        "Invalid CSV row {}: {}",
+                        row_count + 1,
+                        e
+                    )))
+                }
             }
         }
-        
+
         Ok(row_count)
     }
-    
+
     /// Optimized analysis for large CSV files using parallel processing
     fn analyze_large_csv(path: &str, column_count: u64) -> Result<u64> {
         // Read file in chunks for parallel processing
         let content = std::fs::read_to_string(path)?;
         let lines: Vec<&str> = content.lines().collect();
-        
+
         if lines.is_empty() {
             return Ok(0);
         }
-        
+
         // Skip header line
         let data_lines = &lines[1..];
-        
+
         if data_lines.len() > 10_000_000 {
-            return Err(LedgerError::validation_error("CSV file has too many rows (>10M)"));
+            return Err(LedgerError::validation_error(
+                "CSV file has too many rows (>10M)",
+            ));
         }
-        
+
         // Process lines in parallel chunks
         let chunk_size = std::cmp::max(1000, data_lines.len() / num_cpus::get());
-        
+
         let validation_results: Result<Vec<()>> = data_lines
             .par_chunks(chunk_size)
             .enumerate()
@@ -267,17 +309,18 @@ impl Dataset {
                     let field_count = line.split(',').count();
                     if field_count != column_count as usize {
                         let row_number = chunk_idx * chunk_size + line_idx + 2; // +2 for 1-based and header
-                        return Err(LedgerError::validation_error(
-                            format!("Row {} has {} fields but expected {}", row_number, field_count, column_count)
-                        ));
+                        return Err(LedgerError::validation_error(format!(
+                            "Row {} has {} fields but expected {}",
+                            row_number, field_count, column_count
+                        )));
                     }
                 }
                 Ok(())
             })
             .collect();
-        
+
         validation_results?;
-        
+
         Ok(data_lines.len() as u64)
     }
 }
@@ -346,7 +389,7 @@ impl PerformanceCache {
             misses: Arc::new(parking_lot::Mutex::new(0)),
         }
     }
-    
+
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         if let Some(mut entry) = self.entries.get_mut(key) {
             entry.last_accessed = Utc::now();
@@ -358,47 +401,47 @@ impl PerformanceCache {
             None
         }
     }
-    
+
     pub fn put(&self, key: String, data: Vec<u8>, hash: String) {
         // Check cache size limits
         if self.entries.len() >= self.max_entries {
             self.evict_lru();
         }
-        
+
         let entry = CacheEntry {
             data,
             hash,
             last_accessed: Utc::now(),
             access_count: 1,
         };
-        
+
         self.entries.insert(key, entry);
     }
-    
+
     pub fn hit_rate(&self) -> f64 {
         let hits = *self.hits.lock();
         let misses = *self.misses.lock();
         let total = hits + misses;
-        
+
         if total == 0 {
             0.0
         } else {
             hits as f64 / total as f64
         }
     }
-    
+
     fn evict_lru(&self) {
         // Simple LRU eviction - remove oldest accessed entry
         let mut oldest_key = String::new();
         let mut oldest_time = Utc::now();
-        
+
         for entry in self.entries.iter() {
             if entry.last_accessed < oldest_time {
                 oldest_time = entry.last_accessed;
                 oldest_key = entry.key().clone();
             }
         }
-        
+
         if !oldest_key.is_empty() {
             self.entries.remove(&oldest_key);
         }
@@ -413,43 +456,47 @@ impl Proof {
             timestamp: chrono::Utc::now(),
         })
     }
-    
+
     pub fn verify(&self) -> bool {
         // Enhanced verification with security checks
         if self.dataset_hash.is_empty() || self.proof_type.is_empty() {
             return false;
         }
-        
+
         // Validate hash format (SHA-256 produces 64 hex characters)
         if self.dataset_hash.len() != 64 {
             return false;
         }
-        
+
         if !self.dataset_hash.chars().all(|c| c.is_ascii_hexdigit()) {
             return false;
         }
-        
+
         // Validate proof type contains only safe characters
-        if !self.proof_type.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        if !self
+            .proof_type
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
             return false;
         }
-        
+
         // Validate timestamp is not in the future (with 5 minute tolerance)
         let now = chrono::Utc::now();
         let tolerance = chrono::Duration::minutes(5);
         if self.timestamp > now + tolerance {
             return false;
         }
-        
+
         // Validate timestamp is not too old (1 year limit)
         let max_age = chrono::Duration::days(365);
         if self.timestamp < now - max_age {
             return false;
         }
-        
+
         true
     }
-    
+
     pub fn metadata(&self) -> serde_json::Value {
         serde_json::json!({
             "proof_type": self.proof_type,
@@ -503,7 +550,7 @@ impl Ledger {
             memory_usage_mb: 0.0,
             throughput_ops_per_sec: 0.0,
         }));
-        
+
         let mut ledger = Ledger {
             name,
             entries: HashMap::new(),
@@ -512,7 +559,7 @@ impl Ledger {
             performance_metrics: metrics,
             operation_start_times: Arc::new(DashMap::new()),
         };
-        
+
         // Load existing entries if file exists
         if std::path::Path::new(&storage_path).exists() {
             if let Ok(content) = std::fs::read_to_string(&storage_path) {
@@ -523,31 +570,39 @@ impl Ledger {
                 }
             }
         }
-        
+
         Ok(ledger)
     }
-    
+
     pub fn notarize_dataset(&mut self, dataset: Dataset, proof_type: String) -> Result<Proof> {
         let operation_id = uuid::Uuid::new_v4().to_string();
         let start_time = std::time::Instant::now();
-        self.operation_start_times.insert(operation_id.clone(), start_time);
-        
+        self.operation_start_times
+            .insert(operation_id.clone(), start_time);
+
         // Validate inputs
         if proof_type.is_empty() {
             return Err(LedgerError::validation_error("Proof type cannot be empty"));
         }
-        
+
         if proof_type.len() > 100 {
-            return Err(LedgerError::validation_error("Proof type cannot exceed 100 characters"));
-        }
-        
-        // Check if dataset name already exists
-        if self.entries.values().any(|entry| entry.dataset_name == dataset.name) {
             return Err(LedgerError::validation_error(
-                format!("Dataset '{}' already exists in ledger", dataset.name)
+                "Proof type cannot exceed 100 characters",
             ));
         }
-        
+
+        // Check if dataset name already exists
+        if self
+            .entries
+            .values()
+            .any(|entry| entry.dataset_name == dataset.name)
+        {
+            return Err(LedgerError::validation_error(format!(
+                "Dataset '{}' already exists in ledger",
+                dataset.name
+            )));
+        }
+
         // Check cache for existing dataset hash computation
         let cache_key = format!("dataset_hash_{}", dataset.name);
         let proof = if let Some(_cached_data) = self.cache.get(&cache_key) {
@@ -556,12 +611,16 @@ impl Ledger {
         } else {
             log::debug!("Cache miss for dataset: {}", dataset.name);
             let proof = Proof::generate(&dataset, proof_type.clone())?;
-            
+
             // Cache the dataset hash
-            self.cache.put(cache_key, dataset.hash.as_bytes().to_vec(), dataset.hash.clone());
+            self.cache.put(
+                cache_key,
+                dataset.hash.as_bytes().to_vec(),
+                dataset.hash.clone(),
+            );
             proof
         };
-        
+
         let entry = LedgerEntry {
             id: uuid::Uuid::new_v4().to_string(),
             dataset_name: dataset.name.clone(),
@@ -570,121 +629,141 @@ impl Ledger {
             proof: proof.clone(),
             timestamp: chrono::Utc::now(),
         };
-        
+
         self.entries.insert(entry.id.clone(), entry);
         self.save()?;
-        
+
         // Update performance metrics
         if let Some(start) = self.operation_start_times.remove(&operation_id) {
             let duration = start.1.elapsed();
             let duration_ms = duration.as_millis() as f64;
-            
+
             if let Ok(mut metrics) = self.performance_metrics.write() {
                 metrics.total_operations += 1;
                 metrics.cache_hit_rate = self.cache.hit_rate();
-                
+
                 // Update average proof time
                 let total_ops = metrics.total_operations as f64;
-                metrics.average_proof_time_ms = 
+                metrics.average_proof_time_ms =
                     (metrics.average_proof_time_ms * (total_ops - 1.0) + duration_ms) / total_ops;
-                    
-                log::info!("Operation completed in {}ms, cache hit rate: {:.2}%", 
-                    duration_ms, metrics.cache_hit_rate * 100.0);
+
+                log::info!(
+                    "Operation completed in {}ms, cache hit rate: {:.2}%",
+                    duration_ms,
+                    metrics.cache_hit_rate * 100.0
+                );
             }
         }
-        
+
         Ok(proof)
     }
-    
+
     pub fn get_dataset_history(&self, name: &str) -> Option<LedgerEntry> {
         self.entries
             .values()
             .find(|entry| entry.dataset_name == name)
             .cloned()
     }
-    
+
     pub fn list_datasets(&self) -> Vec<LedgerEntry> {
         self.entries.values().cloned().collect()
     }
-    
+
     pub fn get_statistics(&self) -> LedgerStats {
-        let datasets: std::collections::HashSet<String> = self.entries
+        let datasets: std::collections::HashSet<String> = self
+            .entries
             .values()
             .map(|e| e.dataset_name.clone())
             .collect();
-        
+
         LedgerStats {
             total_datasets: datasets.len(),
             total_operations: self.entries.len(),
             storage_path: Some(self.storage_path.clone()),
         }
     }
-    
+
     pub fn verify_integrity(&self) -> Result<bool> {
         log::info!("Starting ledger integrity verification");
-        
+
         if self.entries.is_empty() {
             log::info!("Ledger is empty - integrity check passed");
             return Ok(true);
         }
-        
+
         let mut verification_errors = Vec::new();
-        
+
         for (entry_id, entry) in &self.entries {
             // Verify entry ID format
             if entry.id != *entry_id {
-                verification_errors.push(format!("Entry ID mismatch: key '{}' vs entry.id '{}'", entry_id, entry.id));
+                verification_errors.push(format!(
+                    "Entry ID mismatch: key '{}' vs entry.id '{}'",
+                    entry_id, entry.id
+                ));
                 continue;
             }
-            
+
             // Verify UUID format
             if uuid::Uuid::parse_str(&entry.id).is_err() {
                 verification_errors.push(format!("Invalid UUID format in entry: {}", entry.id));
             }
-            
+
             // Verify proof
             if !entry.proof.verify() {
-                verification_errors.push(format!("Proof verification failed for entry: {}", entry.id));
+                verification_errors
+                    .push(format!("Proof verification failed for entry: {}", entry.id));
             }
-            
+
             // Verify dataset name consistency
             if entry.dataset_name.is_empty() {
                 verification_errors.push(format!("Empty dataset name in entry: {}", entry.id));
             }
-            
+
             // Verify hash consistency
             if entry.dataset_hash != entry.proof.dataset_hash {
-                verification_errors.push(format!("Hash mismatch in entry {}: ledger='{}' vs proof='{}'", 
-                    entry.id, entry.dataset_hash, entry.proof.dataset_hash));
+                verification_errors.push(format!(
+                    "Hash mismatch in entry {}: ledger='{}' vs proof='{}'",
+                    entry.id, entry.dataset_hash, entry.proof.dataset_hash
+                ));
             }
-            
+
             // Check for duplicate dataset names
-            let duplicate_count = self.entries.values()
+            let duplicate_count = self
+                .entries
+                .values()
                 .filter(|e| e.dataset_name == entry.dataset_name)
                 .count();
-            
+
             if duplicate_count > 1 {
-                verification_errors.push(format!("Duplicate dataset name '{}' found in entry: {}", 
-                    entry.dataset_name, entry.id));
+                verification_errors.push(format!(
+                    "Duplicate dataset name '{}' found in entry: {}",
+                    entry.dataset_name, entry.id
+                ));
             }
         }
-        
+
         if !verification_errors.is_empty() {
-            log::warn!("Integrity verification failed with {} errors:", verification_errors.len());
+            log::warn!(
+                "Integrity verification failed with {} errors:",
+                verification_errors.len()
+            );
             for error in &verification_errors {
                 log::warn!("  - {}", error);
             }
             Ok(false)
         } else {
-            log::info!("Ledger integrity verification passed for {} entries", self.entries.len());
+            log::info!(
+                "Ledger integrity verification passed for {} entries",
+                self.entries.len()
+            );
             Ok(true)
         }
     }
-    
+
     pub fn verify_proof(&self, proof: &Proof) -> bool {
         proof.verify()
     }
-    
+
     pub fn health_check(&self) -> Result<HealthStatus> {
         let storage_accessible = std::path::Path::new(&self.storage_path).exists();
         let integrity_verified = self.verify_integrity().unwrap_or(false);
@@ -696,7 +775,7 @@ impl Ledger {
         } else {
             0
         };
-        
+
         let mut issues = Vec::new();
         if !storage_accessible {
             issues.push("Storage file not accessible".to_string());
@@ -704,7 +783,7 @@ impl Ledger {
         if !integrity_verified {
             issues.push("Ledger integrity verification failed".to_string());
         }
-        
+
         Ok(HealthStatus {
             is_healthy: storage_accessible && integrity_verified,
             last_check: chrono::Utc::now(),
@@ -715,20 +794,20 @@ impl Ledger {
             issues,
         })
     }
-    
+
     pub fn get_performance_metrics(&self) -> PerformanceMetrics {
         if let Ok(metrics) = self.performance_metrics.read() {
             let mut result = metrics.clone();
             result.cache_hit_rate = self.cache.hit_rate();
-            
+
             // Calculate memory usage
             result.memory_usage_mb = self.estimate_memory_usage_mb();
-            
+
             // Calculate throughput (operations per second)
             if result.average_proof_time_ms > 0.0 {
                 result.throughput_ops_per_sec = 1000.0 / result.average_proof_time_ms;
             }
-            
+
             result
         } else {
             PerformanceMetrics {
@@ -743,62 +822,68 @@ impl Ledger {
             }
         }
     }
-    
+
     /// Estimate current memory usage in MB
     fn estimate_memory_usage_mb(&self) -> f64 {
         let entry_count = self.entries.len();
         let cache_entries = self.cache.entries.len();
-        
+
         // Rough estimation: 1KB per ledger entry, 10KB per cache entry
         let ledger_size = entry_count * 1024;
         let cache_size = cache_entries * 10240;
-        
+
         (ledger_size + cache_size) as f64 / (1024.0 * 1024.0)
     }
-    
+
     fn save(&self) -> Result<()> {
         // Create backup before saving
         if std::path::Path::new(&self.storage_path).exists() {
-            let backup_path = format!("{}.backup.{}", 
-                self.storage_path, 
+            let backup_path = format!(
+                "{}.backup.{}",
+                self.storage_path,
                 chrono::Utc::now().format("%Y%m%d_%H%M%S")
             );
-            
+
             if let Err(e) = std::fs::copy(&self.storage_path, &backup_path) {
                 log::warn!("Failed to create backup: {}", e);
             } else {
                 log::info!("Created backup at: {}", backup_path);
             }
         }
-        
+
         // Ensure directory exists
         if let Some(parent) = std::path::Path::new(&self.storage_path).parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 LedgerError::StorageError(format!("Failed to create directory: {}", e))
             })?;
         }
-        
+
         // Serialize to JSON
-        let json = serde_json::to_string_pretty(&self.entries)
-            .map_err(|e| LedgerError::StorageError(format!("Failed to serialize ledger data: {}", e)))?;
-        
+        let json = serde_json::to_string_pretty(&self.entries).map_err(|e| {
+            LedgerError::StorageError(format!("Failed to serialize ledger data: {}", e))
+        })?;
+
         // Atomic write using temporary file
         let temp_path = format!("{}.tmp", self.storage_path);
-        std::fs::write(&temp_path, &json)
-            .map_err(|e| LedgerError::StorageError(format!("Failed to write temporary file: {}", e)))?;
-        
+        std::fs::write(&temp_path, &json).map_err(|e| {
+            LedgerError::StorageError(format!("Failed to write temporary file: {}", e))
+        })?;
+
         // Atomic rename
         std::fs::rename(&temp_path, &self.storage_path)
             .map_err(|e| LedgerError::StorageError(format!("Failed to save ledger file: {}", e)))?;
-        
+
         // Verify write integrity
-        let verification = std::fs::read_to_string(&self.storage_path)
-            .map_err(|e| LedgerError::StorageError(format!("Failed to verify saved file: {}", e)))?;
-        
+        let verification = std::fs::read_to_string(&self.storage_path).map_err(|e| {
+            LedgerError::StorageError(format!("Failed to verify saved file: {}", e))
+        })?;
+
         if verification != json {
-            return Err(LedgerError::data_integrity_error("Saved file verification failed"));
+            return Err(LedgerError::data_integrity_error(
+                "Saved file verification failed",
+            ));
         }
-        
+
         log::info!("Ledger saved successfully to: {}", self.storage_path);
         Ok(())
     }
@@ -830,8 +915,11 @@ mod tests {
         assert!(!dataset.hash.is_empty());
 
         // Test ledger operations
-        let mut ledger = Ledger::with_storage("test".to_string(), "/tmp/test_ledger.json".to_string()).unwrap();
-        let proof = ledger.notarize_dataset(dataset, "integrity".to_string()).unwrap();
+        let mut ledger =
+            Ledger::with_storage("test".to_string(), "/tmp/test_ledger.json".to_string()).unwrap();
+        let proof = ledger
+            .notarize_dataset(dataset, "integrity".to_string())
+            .unwrap();
         assert!(proof.verify());
 
         // Test statistics

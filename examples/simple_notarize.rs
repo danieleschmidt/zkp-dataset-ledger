@@ -1,42 +1,39 @@
 //! Simple example demonstrating basic dataset notarization.
 
-use zkp_dataset_ledger::{Dataset, Ledger, ProofConfig, Result};
+use zkp_dataset_ledger::{Dataset, DatasetFormat, Ledger, Result};
 
 fn main() -> Result<()> {
     println!("🚀 ZKP Dataset Ledger - Simple Notarization Example");
 
-    // Initialize library
-    zkp_dataset_ledger::init()?;
+    // Initialize logging
+    env_logger::init();
 
-    // Create a new ledger
-    let mut ledger = Ledger::new("example-project")?;
+    // Create a new ledger with storage
+    let mut ledger = Ledger::with_storage(
+        "example-project".to_string(),
+        "./example_ledger/ledger.json".to_string(),
+    )?;
 
-    // Create a simple dataset
-    let dataset = Dataset {
-        name: "training-data-v1".to_string(),
-        hash: "abc123def456".to_string(),
-        size: 1024,
-        row_count: Some(100),
-        column_count: Some(5),
-        schema: None,
-        statistics: None,
-        format: zkp_dataset_ledger::DatasetFormat::Csv,
-        path: Some("data/train.csv".to_string()),
-    };
+    // Create test CSV file
+    std::fs::create_dir_all("./tmp")?;
+    let test_path = "./tmp/test_data.csv";
+    std::fs::write(test_path, "name,age,score\nAlice,25,85\nBob,30,92\n")?;
+
+    // Create dataset from file
+    let dataset = Dataset::new("training-data-v1".to_string(), test_path.to_string())?;
 
     println!("📋 Notarizing dataset: {}", dataset.name);
 
     // Generate proof and add to ledger
-    let proof_config = ProofConfig::default();
-    let proof = ledger.notarize_dataset(dataset, "training-data-v1", proof_config)?;
+    let proof = ledger.notarize_dataset(dataset, "integrity".to_string())?;
 
     println!("✅ Successfully notarized dataset!");
-    println!("   Proof size: {} bytes", proof.size_bytes());
     println!("   Dataset hash: {}", &proof.dataset_hash[..16]);
+    println!("   Proof type: {}", proof.proof_type);
     println!("   Timestamp: {}", proof.timestamp);
 
     // Verify the proof
-    let is_valid = proof.verify()?;
+    let is_valid = ledger.verify_proof(&proof);
     if is_valid {
         println!("🔍 Proof verification: PASSED");
     } else {
@@ -44,11 +41,18 @@ fn main() -> Result<()> {
     }
 
     // Show ledger status
-    let summary = ledger.get_summary()?;
+    let stats = ledger.get_statistics();
     println!("\n📊 Ledger Summary:");
-    println!("   Total entries: {}", summary.total_entries);
-    println!("   Datasets tracked: {}", summary.datasets_tracked);
-    println!("   Storage size: {} bytes", summary.storage_size_bytes);
+    println!("   Total entries: {}", stats.total_operations);
+    println!("   Datasets tracked: {}", stats.total_datasets);
+    if let Some(path) = stats.storage_path {
+        println!("   Storage path: {}", path);
+    }
+
+    // Cleanup
+    std::fs::remove_file(test_path).ok();
+    std::fs::remove_dir_all("./tmp").ok();
+    std::fs::remove_dir_all("./example_ledger").ok();
 
     Ok(())
 }
