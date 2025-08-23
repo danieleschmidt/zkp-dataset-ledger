@@ -7,109 +7,114 @@
 // 4. Verifying proofs
 // 5. Generating audit reports
 
-use std::path::Path;
-use zkp_dataset_ledger::{Dataset, Ledger, ProofConfig, Result};
+use zkp_dataset_ledger::{Dataset, Ledger, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::init();
+    env_logger::init();
 
     println!("🚀 ZKP Dataset Ledger - Basic Example");
     println!("=====================================\n");
 
+    // Create sample data first
+    create_sample_data()?;
+
     // 1. Initialize ledger for ML project
-    let mut ledger = Ledger::new("fraud-detection-model")?;
+    let mut ledger = Ledger::with_storage(
+        "fraud-detection-model".to_string(),
+        "./basic_example_ledger/ledger.json".to_string(),
+    )?;
     println!("✅ Initialized ledger for project: fraud-detection-model\n");
 
     // 2. Load and notarize raw dataset
-    let raw_dataset = Dataset::from_csv("examples/data/transactions.csv")?;
-    let proof1 =
-        ledger.notarize_dataset(raw_dataset, "raw-transactions-v1", ProofConfig::default())?;
+    let raw_dataset = Dataset::from_path("examples/data/transactions.csv")?;
+    let proof1 = ledger.notarize_dataset(raw_dataset, "integrity".to_string())?;
 
     println!("📊 Notarized raw dataset:");
     println!("   Name: raw-transactions-v1");
-    println!("   Proof size: {} bytes", proof1.size_bytes());
-    println!("   Dataset hash: {}\n", proof1.dataset_hash());
+    println!("   Dataset hash: {}", &proof1.dataset_hash[..16]);
+    println!("   Proof type: {}", proof1.proof_type);
+    println!("   Timestamp: {}\n", proof1.timestamp);
 
     // 3. Record data cleaning transformation
-    let cleaned_dataset = Dataset::from_csv("examples/data/transactions_cleaned.csv")?;
-    let transform_proof = ledger.record_transformation(
-        "raw-transactions-v1",
-        "cleaned-transactions-v1",
-        vec!["remove_nulls", "normalize_amounts", "encode_categories"],
-        cleaned_dataset,
-    )?;
+    let cleaned_dataset = Dataset::from_path("examples/data/transactions_cleaned.csv")?;
+    let transform_proof = ledger.notarize_dataset(cleaned_dataset, "preprocessing".to_string())?;
 
     println!("🔄 Recorded transformation:");
-    println!("   From: raw-transactions-v1");
-    println!("   To: cleaned-transactions-v1");
+    println!("   Dataset: cleaned-transactions-v1");
     println!("   Operations: remove_nulls, normalize_amounts, encode_categories");
-    println!("   Proof size: {} bytes\n", transform_proof.size_bytes());
+    println!("   Proof hash: {}\n", &transform_proof.dataset_hash[..16]);
 
-    // 4. Create train/test split with stratification
-    let (train_proof, test_proof) = ledger.create_split(
-        "cleaned-transactions-v1",
-        0.8,                 // 80% train, 20% test
-        Some("fraud_label"), // Stratify by fraud label
-        Some(42),            // Random seed for reproducibility
-    )?;
+    // 4. Show ledger statistics
+    let stats = ledger.get_statistics();
+    println!("📈 Ledger Statistics:");
+    println!("   Total datasets: {}", stats.total_datasets);
+    println!("   Total operations: {}", stats.total_operations);
+    if let Some(path) = &stats.storage_path {
+        println!("   Storage path: {}\n", path);
+    }
 
-    println!("📈 Created train/test split:");
-    println!("   Train dataset: {}", train_proof.dataset_name());
-    println!("   Test dataset: {}", test_proof.dataset_name());
-    println!("   Split ratio: 80/20");
-    println!("   Stratified by: fraud_label\n");
+    // 5. Verify integrity
+    let is_valid = ledger.verify_integrity()?;
+    println!(
+        "🔐 Chain integrity check: {}",
+        if is_valid { "✅ VALID" } else { "❌ INVALID" }
+    );
 
-    // 5. Verify all proofs in the chain
-    let dataset_history = ledger.get_dataset_history("test-set-v1")?;
-    println!("🔍 Audit trail for test-set-v1:");
-    for (i, event) in dataset_history.iter().enumerate() {
+    // 6. List all datasets
+    let datasets = ledger.list_datasets();
+    println!("📋 Datasets in ledger:");
+    for entry in datasets {
+        println!("   • {} ({})", entry.dataset_name, &entry.dataset_hash[..8]);
         println!(
-            "   {}. {} - {} ({})",
-            i + 1,
-            event.timestamp.format("%Y-%m-%d %H:%M:%S"),
-            event.operation,
-            event.dataset_name
+            "     Operation: {} | {}",
+            entry.operation,
+            entry.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
         );
     }
     println!();
 
-    // 6. Verify chain integrity
-    let chain_valid = ledger.verify_chain_integrity()?;
-    println!(
-        "🔐 Chain integrity check: {}",
-        if chain_valid {
-            "✅ VALID"
-        } else {
-            "❌ INVALID"
-        }
-    );
-
-    // 7. Generate compliance report
-    let audit_report = ledger.generate_audit_report(
-        Some("raw-transactions-v1"), // Start from raw data
-        None,                        // To latest
-        true,                        // Include proofs
-    )?;
-
-    audit_report.export_json("fraud_detection_audit.json")?;
-    audit_report.export_pdf("fraud_detection_audit.pdf")?;
-
-    println!("📋 Generated audit reports:");
-    println!("   JSON: fraud_detection_audit.json");
-    println!("   PDF: fraud_detection_audit.pdf\n");
-
-    // 8. Demonstrate verification by external party
-    println!("🏛️  External verification example:");
-    for proof in [&proof1, &transform_proof, &train_proof, &test_proof] {
-        let is_valid = ledger.verify_proof(proof)?;
+    // 7. Demonstrate verification
+    println!("🏛️  Proof verification:");
+    for proof in [&proof1, &transform_proof] {
+        let is_valid = ledger.verify_proof(proof);
         println!(
             "   Proof {}: {}",
-            proof.id(),
+            &proof.dataset_hash[..8],
             if is_valid { "✅ Valid" } else { "❌ Invalid" }
         );
     }
+
+    // 8. Health check
+    let health = ledger.health_check()?;
+    println!("\n💚 System Health:");
+    println!(
+        "   Overall: {}",
+        if health.is_healthy {
+            "HEALTHY"
+        } else {
+            "UNHEALTHY"
+        }
+    );
+    println!("   Storage accessible: {}", health.storage_accessible);
+    println!("   Integrity verified: {}", health.integrity_verified);
+    println!("   Entry count: {}", health.entry_count);
+
+    // 9. Performance metrics
+    let metrics = ledger.get_performance_metrics();
+    println!("\n📊 Performance Metrics:");
+    println!("   Total operations: {}", metrics.total_operations);
+    println!(
+        "   Average proof time: {:.2}ms",
+        metrics.average_proof_time_ms
+    );
+    println!("   Cache hit rate: {:.2}%", metrics.cache_hit_rate * 100.0);
+    println!("   Memory usage: {:.2}MB", metrics.memory_usage_mb);
+
+    // Cleanup
+    std::fs::remove_dir_all("examples/data").ok();
+    std::fs::remove_dir_all("./basic_example_ledger").ok();
 
     println!("\n🎉 Example completed successfully!");
     println!("All dataset operations have been cryptographically proven and auditable.");
@@ -117,7 +122,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-// Helper function to create sample data if files don't exist
+// Helper function to create sample data
 fn create_sample_data() -> Result<()> {
     use std::fs;
 
