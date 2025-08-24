@@ -27,6 +27,7 @@ fn benchmark_proof_generation(c: &mut Criterion) {
                     std::fs::write(&test_csv, generate_test_data(size)).unwrap();
 
                     let ledger_path = temp_dir.path().join("benchmark_ledger.json");
+                    #[allow(unused_mut)]
                     let mut ledger = Ledger::with_storage(
                         "benchmark".to_string(),
                         ledger_path.to_string_lossy().to_string(),

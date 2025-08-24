@@ -4,6 +4,7 @@ use crate::circuits::{Curve, Fr};
 use crate::{Dataset, LedgerError, Result};
 use ark_ff::{Field, One, Zero};
 use ark_r1cs_std::prelude::*;
+use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,6 @@
 //! Advanced optimization techniques for ZK proof generation and verification.
 
-use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
+use crate::{Dataset, LedgerError, Proof, Result};
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,7 @@ impl ZkOptimizationEngine {
         proof_configs: &[ProofConfig],
     ) -> Result<Vec<OptimizedProof>> {
         if datasets.len() != proof_configs.len() {
-            return Err(LedgerError::internal(
+            return Err(LedgerError::validation_error(
                 "Datasets and proof configs length mismatch",
             ));
         }

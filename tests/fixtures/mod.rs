@@ -158,6 +158,12 @@ impl MockProofConfig {
     }
 }
 
+impl Default for TestDataGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Test helper for creating ledger instances
 pub struct TestLedger {
     pub temp_dir: TempDir,
@@ -189,6 +195,12 @@ impl TestLedger {
 
     pub fn temp_path(&self) -> &Path {
         self.temp_dir.path()
+    }
+}
+
+impl Default for TestLedger {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -232,6 +244,12 @@ impl PerformanceTester {
             elapsed,
             max_secs
         );
+    }
+}
+
+impl Default for PerformanceTester {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

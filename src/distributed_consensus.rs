@@ -9,12 +9,12 @@
 
 use crate::{AdvancedProof, LedgerError, Result};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, RwLock, Mutex};
-use tokio::sync::{mpsc, oneshot};
 use dashmap::DashMap;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Arc, Mutex, RwLock};
+// use tokio::sync::{mpsc, oneshot};
 
 /// Distributed ledger node configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +72,7 @@ pub struct ConsensusNode {
     algorithm: ConsensusAlgorithm,
     state: Arc<RwLock<NodeState>>,
     current_term: Arc<RwLock<u64>>,
+    #[allow(dead_code)]
     voted_for: Arc<RwLock<Option<String>>>,
     log: Arc<RwLock<Vec<LogEntry>>>,
     peers: Arc<RwLock<HashMap<String, PeerInfo>>>,
@@ -125,38 +126,42 @@ impl ConsensusNode {
         match self.algorithm {
             ConsensusAlgorithm::Raft => {
                 self.start_raft_algorithm().await?;
-            },
+            }
             ConsensusAlgorithm::PBFT => {
                 self.start_pbft_algorithm().await?;
-            },
+            }
             _ => {
-                return Err(LedgerError::ConfigurationError(
-                    format!("Consensus algorithm {:?} not implemented", self.algorithm)
-                ));
+                return Err(LedgerError::ConfigurationError(format!(
+                    "Consensus algorithm {:?} not implemented",
+                    self.algorithm
+                )));
             }
         }
-        
-        log::info!("Consensus node {} started successfully", self.config.node_id);
+
+        log::info!(
+            "Consensus node {} started successfully",
+            self.config.node_id
+        );
         Ok(())
     }
 
     /// Start Raft consensus algorithm
     async fn start_raft_algorithm(&mut self) -> Result<()> {
         log::info!("Starting Raft consensus for node: {}", self.config.node_id);
-        
+
         // Initialize as follower
         *self.state.write().unwrap() = NodeState::Follower;
-        
+
         // Start election timer
         self.reset_election_timer().await;
-        
+
         Ok(())
     }
 
     /// Start PBFT consensus algorithm
     async fn start_pbft_algorithm(&mut self) -> Result<()> {
         log::info!("Starting PBFT consensus for node: {}", self.config.node_id);
-        
+
         // PBFT implementation would go here
         // For now, return success as placeholder
         Ok(())
@@ -165,7 +170,7 @@ impl ConsensusNode {
     /// Add peer node to the cluster
     pub fn add_peer(&mut self, peer_config: NodeConfig) -> Result<()> {
         let peer_id = peer_config.node_id.clone();
-        
+
         let peer_info = PeerInfo {
             config: peer_config,
             last_seen: Utc::now(),
@@ -173,10 +178,10 @@ impl ConsensusNode {
             message_count: 0,
             latency_ms: 0.0,
         };
-        
+
         let mut peers = self.peers.write().unwrap();
         peers.insert(peer_id.clone(), peer_info);
-        
+
         log::info!("Added peer {} to node {}", peer_id, self.config.node_id);
         Ok(())
     }
@@ -184,7 +189,7 @@ impl ConsensusNode {
     /// Get current node metrics
     pub fn get_metrics(&self) -> NodeMetrics {
         let mut metrics = self.metrics.read().unwrap().clone();
-        
+
         // Update dynamic fields
         metrics.uptime_seconds = (Utc::now() - self.start_time).num_seconds() as u64;
         metrics.log_length = self.log.read().unwrap().len();
@@ -192,7 +197,7 @@ impl ConsensusNode {
         metrics.message_queue_size = self.message_queue.lock().unwrap().len();
         metrics.state = *self.state.read().unwrap();
         metrics.current_term = *self.current_term.read().unwrap();
-        
+
         metrics
     }
 
@@ -200,9 +205,9 @@ impl ConsensusNode {
     pub fn health_check(&self) -> DistributedHealthStatus {
         let state = *self.state.read().unwrap();
         let metrics = self.get_metrics();
-        
+
         let issues = Vec::new();
-        
+
         DistributedHealthStatus {
             node_id: self.config.node_id.clone(),
             is_healthy: issues.is_empty(),
@@ -218,22 +223,24 @@ impl ConsensusNode {
 
     /// Reset election timer
     async fn reset_election_timer(&mut self) {
-        let timeout = self.config.election_timeout_ms + 
-            rand::thread_rng().gen_range(0..self.config.election_timeout_ms / 2);
-            
+        let timeout = self.config.election_timeout_ms
+            + rand::thread_rng().gen_range(0..self.config.election_timeout_ms / 2);
+
         let mut timer = self.election_timer.lock().unwrap();
-        *timer = Some(tokio::time::interval(std::time::Duration::from_millis(timeout)));
+        *timer = Some(tokio::time::interval(std::time::Duration::from_millis(
+            timeout,
+        )));
     }
 
     /// Detect and handle Byzantine failures
     pub fn detect_byzantine_failures(&mut self) -> Vec<String> {
         let mut detected_failures = Vec::new();
-        
+
         // Check suspicion scores
         for entry in self.suspicion_scores.iter() {
             let node_id = entry.key();
             let score = *entry.value();
-            
+
             // If suspicion score exceeds threshold, mark as faulty
             if score > 0.7 {
                 let mut faulty_nodes = self.faulty_nodes.write().unwrap();
@@ -243,13 +250,14 @@ impl ConsensusNode {
                 }
             }
         }
-        
+
         detected_failures
     }
 
     /// Update suspicion score for a node
     pub fn update_suspicion_score(&self, node_id: &str, delta: f64) {
-        self.suspicion_scores.entry(node_id.to_string())
+        self.suspicion_scores
+            .entry(node_id.to_string())
             .and_modify(|score| {
                 *score = (*score + delta).clamp(0.0, 1.0);
             })
@@ -358,7 +366,7 @@ mod tests {
             node_id: "test-node-1".to_string(),
             ..Default::default()
         };
-        
+
         let node = ConsensusNode::new(config, ConsensusAlgorithm::Raft);
         assert_eq!(node.config.node_id, "test-node-1");
         assert_eq!(*node.state.read().unwrap(), NodeState::Follower);
@@ -367,11 +375,8 @@ mod tests {
 
     #[test]
     fn test_node_health_check() {
-        let node = ConsensusNode::new(
-            NodeConfig::default(),
-            ConsensusAlgorithm::Raft
-        );
-        
+        let node = ConsensusNode::new(NodeConfig::default(), ConsensusAlgorithm::Raft);
+
         let health = node.health_check();
         assert_eq!(health.node_id, node.config.node_id);
         assert!(health.is_healthy); // New node should be healthy
@@ -380,14 +385,11 @@ mod tests {
 
     #[test]
     fn test_byzantine_failure_detection() {
-        let mut node = ConsensusNode::new(
-            NodeConfig::default(),
-            ConsensusAlgorithm::PBFT
-        );
-        
+        let mut node = ConsensusNode::new(NodeConfig::default(), ConsensusAlgorithm::PBFT);
+
         // Simulate suspicious behavior
         node.update_suspicion_score("suspicious-node", 0.8);
-        
+
         let failures = node.detect_byzantine_failures();
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0], "suspicious-node");

@@ -1,7 +1,7 @@
 //! Comprehensive demonstration of ZKP Dataset Ledger capabilities
 //! This example showcases core features in a realistic workflow.
 
-use zkp_dataset_ledger::{Dataset, DatasetFormat, Ledger, Result};
+use zkp_dataset_ledger::{Dataset, Ledger, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -188,7 +188,7 @@ async fn demo_ml_pipeline_audit() -> Result<()> {
         "./ml_data/raw_data.csv".to_string(),
     )?;
 
-    let raw_proof = ml_ledger.notarize_dataset(raw_data, "data-ingestion".to_string())?;
+    let _raw_proof = ml_ledger.notarize_dataset(raw_data, "data-ingestion".to_string())?;
     println!("    ✅ Raw data ingested and notarized");
 
     // Step 2: Data preprocessing
@@ -202,7 +202,7 @@ async fn demo_ml_pipeline_audit() -> Result<()> {
         "./ml_data/cleaned_data.csv".to_string(),
     )?;
 
-    let clean_proof = ml_ledger.notarize_dataset(cleaned_data, "preprocessing".to_string())?;
+    let _clean_proof = ml_ledger.notarize_dataset(cleaned_data, "preprocessing".to_string())?;
     println!("    ✅ Data cleaned and preprocessing recorded");
 
     // Step 3: Feature engineering
@@ -216,7 +216,7 @@ async fn demo_ml_pipeline_audit() -> Result<()> {
         "./ml_data/features.csv".to_string(),
     )?;
 
-    let feature_proof =
+    let _feature_proof =
         ml_ledger.notarize_dataset(feature_data, "feature-engineering".to_string())?;
     println!("    ✅ Feature engineering completed and verified");
 
@@ -231,7 +231,7 @@ async fn demo_ml_pipeline_audit() -> Result<()> {
         "./ml_data/train_split.csv".to_string(),
     )?;
 
-    let split_proof = ml_ledger.notarize_dataset(train_split, "train-test-split".to_string())?;
+    let _split_proof = ml_ledger.notarize_dataset(train_split, "train-test-split".to_string())?;
     println!("    ✅ Train/test split recorded with cryptographic proof");
 
     // Generate final audit report

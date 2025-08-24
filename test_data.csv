@@ -1,4 +1,1 @@
-name,age,score
-Alice,25,85.5
-Bob,30,92.0
-Charlie,22,78.3
+name,age,score\nAlice,25,85\nBob,30,92\nCharlie,28,78

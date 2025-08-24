@@ -12,7 +12,7 @@ pub mod mod_research;
 pub mod optimization;
 pub mod streaming_zkp;
 
-use crate::{Dataset, LedgerError, ProofConfig, Result};
+use crate::{Dataset, LedgerError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -177,7 +177,7 @@ impl ResearchExperiment {
                 "nova_folding" => self.simulate_nova()?,
                 "custom_polynomial" => self.simulate_custom_polynomial()?,
                 _ => {
-                    return Err(LedgerError::internal(&format!(
+                    return Err(LedgerError::validation_error(format!(
                         "Unknown algorithm: {}",
                         algorithm
                     )))

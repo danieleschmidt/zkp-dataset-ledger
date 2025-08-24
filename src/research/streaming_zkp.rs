@@ -57,7 +57,7 @@ impl StreamingZKP {
     pub fn process_stream<R: Read>(
         &self,
         mut reader: R,
-        dataset_name: &str,
+        _dataset_name: &str,
     ) -> Result<StreamingProof> {
         let mut chunk_proofs = Vec::new();
         let mut total_rows = 0;

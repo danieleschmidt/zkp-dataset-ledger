@@ -1,0 +1,38 @@
+# ZKP Dataset Ledger Configuration
+# Generated template - customize as needed
+
+[ledger]
+hash_algorithm = "sha3-256"
+default_proof_type = "integrity"
+auto_backup = true
+backup_retention_days = 30
+
+[security]
+encrypt_storage = false
+key_rotation_days = 90
+audit_retention_days = 365
+
+[performance]
+parallel_processing = true
+worker_threads = 0
+enable_cache = true
+cache_size_mb = 100
+
+[storage]
+backend = "json"
+default_path = "./zkp_ledger"
+compression = false
+max_file_size_mb = 1024
+
+[logging]
+level = "info"
+log_to_file = false
+structured = false
+
+
+# Environment Variables:
+# ZKP_HASH_ALGORITHM - Override hash algorithm
+# ZKP_DEFAULT_PROOF_TYPE - Override default proof type
+# ZKP_LOG_LEVEL - Override log level
+# ZKP_STORAGE_PATH - Override storage path
+# ZKP_PARALLEL_PROCESSING - Enable/disable parallel processing

@@ -1,13 +1,14 @@
 //! Zero-Knowledge Proof Circuits
 //! Simplified version for compilation
 
-use crate::{LedgerError, Result};
-use serde::{Deserialize, Serialize};
+use crate::Result;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// ZK Proof system interface
 #[derive(Debug, Clone)]
 pub struct ZkProofSystem {
+    #[allow(dead_code)]
     config: ZkProofConfig,
 }
 
@@ -21,29 +22,45 @@ impl ZkProofSystem {
         Ok(())
     }
 
-    pub fn prove_dataset_integrity(&self, _dataset_hash: &str, _row_count: usize, _column_count: usize) -> Result<ZkIntegrityProof> {
+    pub fn prove_dataset_integrity(
+        &self,
+        _dataset_hash: &str,
+        _row_count: usize,
+        _column_count: usize,
+    ) -> Result<ZkIntegrityProof> {
         self.generate_integrity_proof(_dataset_hash, _row_count, _column_count)
     }
 
-    pub fn prove_statistical_properties(&self, _bounds: &StatisticalBounds) -> Result<ZkStatisticalProof> {
+    pub fn prove_statistical_properties(
+        &self,
+        _bounds: &StatisticalBounds,
+    ) -> Result<ZkStatisticalProof> {
         self.generate_statistical_proof(_bounds)
     }
 
-    pub fn generate_integrity_proof(&self, _dataset_hash: &str, _row_count: usize, _column_count: usize) -> Result<ZkIntegrityProof> {
+    pub fn generate_integrity_proof(
+        &self,
+        _dataset_hash: &str,
+        _row_count: usize,
+        _column_count: usize,
+    ) -> Result<ZkIntegrityProof> {
         // Simplified implementation - would use actual ZK circuits in production
         Ok(ZkIntegrityProof {
             proof_data: vec![0u8; 32], // Placeholder proof
-            public_inputs: vec![], 
+            public_inputs: vec![],
             timestamp: Utc::now(),
             circuit_type: ZkCircuitType::DatasetIntegrity,
         })
     }
 
-    pub fn generate_statistical_proof(&self, bounds: &StatisticalBounds) -> Result<ZkStatisticalProof> {
+    pub fn generate_statistical_proof(
+        &self,
+        bounds: &StatisticalBounds,
+    ) -> Result<ZkStatisticalProof> {
         // Simplified implementation - would use actual ZK circuits in production
         Ok(ZkStatisticalProof::new(
             vec![0u8; 32], // Placeholder proof
-            bounds.clone()
+            bounds.clone(),
         ))
     }
 
@@ -53,7 +70,7 @@ impl ZkProofSystem {
     }
 
     pub fn verify_statistical_proof(&self, _proof: &ZkStatisticalProof) -> Result<bool> {
-        // Simplified verification - would use actual ZK verification in production  
+        // Simplified verification - would use actual ZK verification in production
         Ok(true)
     }
 }
@@ -87,9 +104,8 @@ pub struct ZkIntegrityProof {
 
 impl ZkIntegrityProof {
     pub fn size_bytes(&self) -> usize {
-        self.proof_data.len() + 
-        self.public_inputs.iter().map(|s| s.len()).sum::<usize>() + 
-        32 // timestamp + circuit_type overhead
+        self.proof_data.len() + self.public_inputs.iter().map(|s| s.len()).sum::<usize>() + 32
+        // timestamp + circuit_type overhead
     }
 }
 
@@ -173,10 +189,13 @@ mod tests {
         let zk_system = ZkProofSystem::new(ZkProofConfig::default());
         let proof = zk_system.generate_integrity_proof("test_hash", 1000, 10);
         assert!(proof.is_ok());
-        
+
         let proof = proof.unwrap();
         assert_eq!(proof.proof_data.len(), 32);
-        assert!(matches!(proof.circuit_type, ZkCircuitType::DatasetIntegrity));
+        assert!(matches!(
+            proof.circuit_type,
+            ZkCircuitType::DatasetIntegrity
+        ));
     }
 
     #[test]
@@ -188,10 +207,10 @@ mod tests {
             mean_range: (20.0, 80.0),
             std_dev_max: 30.0,
         };
-        
+
         let proof = zk_system.generate_statistical_proof(&bounds);
         assert!(proof.is_ok());
-        
+
         let proof = proof.unwrap();
         assert_eq!(proof.proof_data.len(), 32);
         assert_eq!(proof.statistical_bounds.min_value, 0.0);
@@ -200,8 +219,10 @@ mod tests {
     #[test]
     fn test_proof_verification() {
         let zk_system = ZkProofSystem::new(ZkProofConfig::default());
-        let proof = zk_system.generate_integrity_proof("test_hash", 1000, 10).unwrap();
-        
+        let proof = zk_system
+            .generate_integrity_proof("test_hash", 1000, 10)
+            .unwrap();
+
         let verification_result = zk_system.verify_integrity_proof(&proof);
         assert!(verification_result.is_ok());
         assert!(verification_result.unwrap());

@@ -1,6 +1,6 @@
 //! Simple example demonstrating basic dataset notarization.
 
-use zkp_dataset_ledger::{Dataset, DatasetFormat, Ledger, Result};
+use zkp_dataset_ledger::{Dataset, Ledger, Result};
 
 fn main() -> Result<()> {
     println!("🚀 ZKP Dataset Ledger - Simple Notarization Example");
