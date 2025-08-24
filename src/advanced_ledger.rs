@@ -831,10 +831,11 @@ mod tests {
         )
         .unwrap();
 
-        // Create a simple composite proof
+        // Create a simple composite proof with valid data (64-character hex hash)
         let simple_proof = SimpleProof {
-            dataset_hash: "test_hash".to_string(),
-            proof_type: "test".to_string(),
+            dataset_hash: "a1b2c3d4e5f6789012345678901234567890abcdefabcdefabcdefabcdef1234"
+                .to_string(),
+            proof_type: "dataset_integrity".to_string(),
             timestamp: Utc::now(),
         };
 
