@@ -333,6 +333,16 @@ pub struct Proof {
     pub timestamp: DateTime<Utc>,
 }
 
+impl Default for Proof {
+    fn default() -> Self {
+        Self {
+            dataset_hash: String::new(),
+            proof_type: String::new(),
+            timestamp: Utc::now(),
+        }
+    }
+}
+
 /// Health status for ledger monitoring
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthStatus {

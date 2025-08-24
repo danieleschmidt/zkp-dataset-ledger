@@ -1,4 +1,16 @@
 {
+  "43a3cc20-baae-4cf8-9d81-24a09705e8c3": {
+    "id": "43a3cc20-baae-4cf8-9d81-24a09705e8c3",
+    "dataset_name": "invalid-csv-test",
+    "dataset_hash": "c747aaffa7e194f83235804a0811d407bf422fb1714166decee5dc006e933922",
+    "operation": "notarize(test)",
+    "proof": {
+      "dataset_hash": "c747aaffa7e194f83235804a0811d407bf422fb1714166decee5dc006e933922",
+      "proof_type": "test",
+      "timestamp": "2025-08-21T22:18:58.374930539Z"
+    },
+    "timestamp": "2025-08-21T22:18:58.374946304Z"
+  },
   "1045de5b-766b-438a-b445-476318bd4353": {
     "id": "1045de5b-766b-438a-b445-476318bd4353",
     "dataset_name": "performance-test-v2",
@@ -11,29 +23,17 @@
     },
     "timestamp": "2025-08-21T22:21:19.420657449Z"
   },
-  "6a963b9c-233c-41d7-84cb-d3b6d78c61b0": {
-    "id": "6a963b9c-233c-41d7-84cb-d3b6d78c61b0",
-    "dataset_name": "employee-data-v2",
-    "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
-    "operation": "notarize(enhanced-integrity)",
+  "7ef54a0a-40f0-409e-a1f7-a747ec0c1199": {
+    "id": "7ef54a0a-40f0-409e-a1f7-a747ec0c1199",
+    "dataset_name": "performance-test-v1",
+    "dataset_hash": "655518d1b0460df8204d7abb84ba5db2d125acf7be1ba459647ddb22ae556935",
+    "operation": "notarize(optimized)",
     "proof": {
-      "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
-      "proof_type": "enhanced-integrity",
-      "timestamp": "2025-08-21T22:16:20.346237416Z"
+      "dataset_hash": "655518d1b0460df8204d7abb84ba5db2d125acf7be1ba459647ddb22ae556935",
+      "proof_type": "optimized",
+      "timestamp": "2025-08-21T22:21:09.313785998Z"
     },
-    "timestamp": "2025-08-21T22:16:20.346304145Z"
-  },
-  "43a3cc20-baae-4cf8-9d81-24a09705e8c3": {
-    "id": "43a3cc20-baae-4cf8-9d81-24a09705e8c3",
-    "dataset_name": "invalid-csv-test",
-    "dataset_hash": "c747aaffa7e194f83235804a0811d407bf422fb1714166decee5dc006e933922",
-    "operation": "notarize(test)",
-    "proof": {
-      "dataset_hash": "c747aaffa7e194f83235804a0811d407bf422fb1714166decee5dc006e933922",
-      "proof_type": "test",
-      "timestamp": "2025-08-21T22:18:58.374930539Z"
-    },
-    "timestamp": "2025-08-21T22:18:58.374946304Z"
+    "timestamp": "2025-08-21T22:21:09.313836717Z"
   },
   "d9445296-9dcb-4cc6-9dd5-3594e1704aef": {
     "id": "d9445296-9dcb-4cc6-9dd5-3594e1704aef",
@@ -59,17 +59,17 @@
     },
     "timestamp": "2025-08-21T22:19:06.716790363Z"
   },
-  "7ef54a0a-40f0-409e-a1f7-a747ec0c1199": {
-    "id": "7ef54a0a-40f0-409e-a1f7-a747ec0c1199",
-    "dataset_name": "performance-test-v1",
-    "dataset_hash": "655518d1b0460df8204d7abb84ba5db2d125acf7be1ba459647ddb22ae556935",
-    "operation": "notarize(optimized)",
+  "6a963b9c-233c-41d7-84cb-d3b6d78c61b0": {
+    "id": "6a963b9c-233c-41d7-84cb-d3b6d78c61b0",
+    "dataset_name": "employee-data-v2",
+    "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
+    "operation": "notarize(enhanced-integrity)",
     "proof": {
-      "dataset_hash": "655518d1b0460df8204d7abb84ba5db2d125acf7be1ba459647ddb22ae556935",
-      "proof_type": "optimized",
-      "timestamp": "2025-08-21T22:21:09.313785998Z"
+      "dataset_hash": "054c96e7e5a20bed59967d9ffd4844d20d7e580841a2db1bbbbbd07fb4312df5",
+      "proof_type": "enhanced-integrity",
+      "timestamp": "2025-08-21T22:16:20.346237416Z"
     },
-    "timestamp": "2025-08-21T22:21:09.313836717Z"
+    "timestamp": "2025-08-21T22:16:20.346304145Z"
   },
   "3569cccd-6d04-46d0-82ac-27f3fe3a928c": {
     "id": "3569cccd-6d04-46d0-82ac-27f3fe3a928c",
@@ -82,17 +82,5 @@
       "timestamp": "2025-08-21T22:14:30.833314079Z"
     },
     "timestamp": "2025-08-21T22:14:30.833364821Z"
-  },
-  "6f77b421-7568-4439-9c7a-5ce75ad4d824": {
-    "id": "6f77b421-7568-4439-9c7a-5ce75ad4d824",
-    "dataset_name": "training-data-v1",
-    "dataset_hash": "5f9ab76b0c763ab5893badbd7b15757a89bb9ec9b16ff5c01c8b8681c151b189",
-    "operation": "notarize(integrity)",
-    "proof": {
-      "dataset_hash": "5f9ab76b0c763ab5893badbd7b15757a89bb9ec9b16ff5c01c8b8681c151b189",
-      "proof_type": "integrity",
-      "timestamp": "2025-08-24T14:25:48.317284309Z"
-    },
-    "timestamp": "2025-08-24T14:25:48.317297864Z"
   }
 }

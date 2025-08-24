@@ -1,6 +1,6 @@
 //! Federated zero-knowledge proofs for distributed dataset validation.
 
-use crate::{Dataset, LedgerError, Proof, ProofConfig, Result};
+use crate::{Dataset, LedgerError, Proof, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
