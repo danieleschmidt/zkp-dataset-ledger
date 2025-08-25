@@ -15,12 +15,12 @@ pub use error_handling::{
     ContextualError, ErrorCategory, ErrorContext, ErrorHandler, ErrorSeverity,
 };
 pub use lib_simple::*;
-pub use monitoring_system::{HealthStatus, MonitoringSystem, PerformanceMetrics, SystemMetrics};
+pub use monitoring_system::{HealthInfo, HealthStatus, MonitoringSystem, PerformanceMetrics, SystemMetrics};
 
 // Advanced cryptographic modules (Generation 1-3 enhancements)
 pub mod advanced_ledger;
 pub mod distributed_consensus;
-// pub mod research;  // Disabled temporarily for compilation
+// pub mod research;  // Temporarily disabled for compilation
 pub mod security_enhanced;
 pub mod zkp_circuits;
 
@@ -45,3 +45,8 @@ pub mod config_manager;
 pub mod error_handling;
 mod lib_simple;
 pub mod monitoring_system;
+
+// Production-grade modules (Generation 3 - MAKE IT SCALE)
+pub mod deployment_manager;
+pub mod performance_profiler;
+pub mod production_orchestrator;
