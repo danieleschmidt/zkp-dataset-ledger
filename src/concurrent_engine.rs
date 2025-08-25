@@ -252,7 +252,7 @@ impl ConcurrentEngine {
         // In a production implementation, you'd need to properly handle type conversion
         let typed_result = TaskResult {
             task_id: result.task_id,
-            result: result.result.map(|_| Default::default()).map_err(|e| e),
+            result: result.result.map(|_| Default::default()),
             execution_time: result.execution_time,
             retry_count: result.retry_count,
             worker_id: result.worker_id,
@@ -587,7 +587,9 @@ mod tests {
 
         // Submit a simple task that returns a String (which implements Default)
         let context = ExecutionContext::default();
-        let result = engine.submit_task(|| Ok("test result".to_string()), context).await;
+        let result = engine
+            .submit_task(|| Ok("test result".to_string()), context)
+            .await;
 
         assert!(result.is_ok());
 

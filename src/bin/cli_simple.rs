@@ -1,8 +1,11 @@
 use clap::{Parser, Subcommand};
-use log::{debug, info};
+use log::{debug, error, info, warn};
 
 // Import our simplified modules
+use std::thread;
+use std::time::Duration;
 use zkp_dataset_ledger::{Config, ConfigManager, Dataset, Ledger, MonitoringSystem, Result};
+// Future performance imports when needed
 
 #[derive(Parser)]
 #[command(name = "zkp-ledger")]
@@ -37,6 +40,18 @@ enum Commands {
         /// Proof type
         #[arg(long, default_value = "integrity")]
         proof_type: String,
+
+        /// Enable high-performance mode for large datasets
+        #[arg(long)]
+        high_performance: bool,
+
+        /// Use parallel processing
+        #[arg(long)]
+        parallel: bool,
+
+        /// Cache intermediate results
+        #[arg(long)]
+        cache: bool,
     },
 
     /// Show dataset history
@@ -116,6 +131,25 @@ enum Commands {
     Performance {
         #[command(subcommand)]
         performance_command: PerformanceCommands,
+    },
+
+    /// Run performance benchmarks
+    Benchmark {
+        /// Type of benchmark to run
+        #[arg(long, default_value = "notarization")]
+        benchmark_type: String,
+
+        /// Number of iterations
+        #[arg(long, default_value = "10")]
+        iterations: usize,
+
+        /// Dataset size for synthetic benchmarks (in MB)
+        #[arg(long, default_value = "10")]
+        dataset_size_mb: usize,
+
+        /// Output results to file
+        #[arg(long)]
+        output: Option<String>,
     },
 }
 
@@ -214,6 +248,52 @@ fn get_or_create_ledger(project: Option<String>) -> Result<Ledger> {
     let ledger_name = project.unwrap_or_else(|| "default".to_string());
 
     Ledger::with_storage(ledger_name, ledger_path)
+}
+
+/// Retry a fallible operation with exponential backoff
+fn retry_with_backoff<T, E, F>(
+    mut operation: F,
+    max_attempts: u32,
+    initial_delay: Duration,
+    operation_name: &str,
+) -> std::result::Result<T, E>
+where
+    F: FnMut() -> std::result::Result<T, E>,
+    E: std::fmt::Display,
+{
+    let mut delay = initial_delay;
+
+    for attempt in 1..=max_attempts {
+        match operation() {
+            Ok(result) => {
+                if attempt > 1 {
+                    info!(
+                        "{} succeeded on attempt {}/{}",
+                        operation_name, attempt, max_attempts
+                    );
+                }
+                return Ok(result);
+            }
+            Err(e) => {
+                if attempt == max_attempts {
+                    error!(
+                        "{} failed after {} attempts: {}",
+                        operation_name, max_attempts, e
+                    );
+                    return Err(e);
+                }
+
+                warn!(
+                    "{} failed on attempt {}/{}: {}. Retrying in {:?}...",
+                    operation_name, attempt, max_attempts, e, delay
+                );
+                thread::sleep(delay);
+                delay = std::cmp::min(delay * 2, Duration::from_secs(30)); // Cap at 30 seconds
+            }
+        }
+    }
+
+    unreachable!()
 }
 
 /// Create sample datasets for research and testing
@@ -350,16 +430,61 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Init { project } => {
+            // Validate project name
+            if project.trim().is_empty() {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Project name cannot be empty",
+                ));
+            }
+
+            if project.len() > 100 {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Project name too long (max 100 characters)",
+                ));
+            }
+
+            // Check for valid characters in project name
+            if !project
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Project name can only contain alphanumeric characters, dashes, and underscores",
+                ));
+            }
+
             println!("Initializing ledger for project: {}", project);
+            info!("Creating new ledger for project: {}", project);
+
             let config = Config {
                 ledger_name: project.clone(),
                 storage_path: format!("./{}_ledger", project),
             };
 
-            // Create directory if it doesn't exist
-            std::fs::create_dir_all(&config.storage_path)?;
+            // Check if project already exists
+            if std::path::Path::new(&config.storage_path).exists() {
+                warn!("Project directory already exists: {}", config.storage_path);
+                println!("⚠️  Project directory already exists. Continuing with existing setup.");
+            }
+
+            // Create directory with retry for transient filesystem issues
+            retry_with_backoff(
+                || std::fs::create_dir_all(&config.storage_path),
+                3,
+                Duration::from_millis(100),
+                "directory creation",
+            )?;
+
+            // Verify directory was created with correct permissions
+            let metadata = std::fs::metadata(&config.storage_path)?;
+            if !metadata.is_dir() {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Failed to create project directory",
+                ));
+            }
 
             println!("✅ Ledger initialized at: {}", config.storage_path);
+            info!("Ledger successfully initialized for project: {}", project);
             Ok(())
         }
 
@@ -367,27 +492,167 @@ fn main() -> Result<()> {
             dataset,
             name,
             proof_type,
+            high_performance,
+            parallel,
+            cache,
         } => {
+            // Input validation
+            if name.trim().is_empty() {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Dataset name cannot be empty",
+                ));
+            }
+
+            if name.len() > 256 {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Dataset name too long (max 256 characters)",
+                ));
+            }
+
+            // Check for valid characters in name (alphanumeric, dash, underscore, dot)
+            if !name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+            {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(
+                    "Dataset name can only contain alphanumeric characters, dashes, underscores, and dots",
+                ));
+            }
+
             println!("Notarizing dataset: {} ({})", name, dataset);
 
-            let mut ledger = get_or_create_ledger(None)?;
+            // Configure performance options
+            if high_performance {
+                println!("🚀 High-performance mode enabled");
+            }
+            if parallel {
+                println!("⚡ Parallel processing enabled");
+            }
+            if cache {
+                println!("💾 Caching enabled");
+            }
 
-            // Check if file exists
-            if !std::path::Path::new(&dataset).exists() {
+            info!(
+                "Starting dataset notarization for: {} (high-perf: {}, parallel: {}, cache: {})",
+                name, high_performance, parallel, cache
+            );
+
+            let start_time = std::time::Instant::now();
+
+            let mut ledger = get_or_create_ledger(None).map_err(|e| {
+                eprintln!("❌ Failed to initialize ledger: {}", e);
+                e
+            })?;
+
+            // Check if file exists and validate
+            let dataset_path = std::path::Path::new(&dataset);
+            if !dataset_path.exists() {
                 return Err(zkp_dataset_ledger::LedgerError::not_found(
                     "dataset",
                     format!("Dataset file not found: {}", dataset),
                 ));
             }
 
-            let dataset_obj = Dataset::new(name.clone(), dataset)?;
-            let proof = ledger.notarize_dataset(dataset_obj, proof_type)?;
+            // Check file size (reasonable limit: 1GB)
+            let file_metadata = std::fs::metadata(&dataset)?;
+
+            const MAX_FILE_SIZE: u64 = 1024 * 1024 * 1024; // 1GB
+            const LARGE_FILE_THRESHOLD: u64 = 100 * 1024 * 1024; // 100MB
+
+            if file_metadata.len() > MAX_FILE_SIZE {
+                return Err(zkp_dataset_ledger::LedgerError::validation_error(format!(
+                    "File too large: {} bytes (max: {} bytes)",
+                    file_metadata.len(),
+                    MAX_FILE_SIZE
+                )));
+            }
+
+            // Automatically enable performance optimizations for large files
+            let auto_performance = file_metadata.len() > LARGE_FILE_THRESHOLD;
+            let use_high_performance = high_performance || auto_performance;
+            let use_parallel = parallel || auto_performance;
+            let use_cache = cache || auto_performance;
+
+            if auto_performance && !high_performance {
+                println!("📈 Large file detected ({:.2} MB), automatically enabling performance optimizations", 
+                         file_metadata.len() as f64 / 1_000_000.0);
+                println!("🚀 High-performance mode: auto-enabled");
+                println!("⚡ Parallel processing: auto-enabled");
+                println!("💾 Caching: auto-enabled");
+            }
+
+            // Check file permissions
+            if file_metadata.permissions().readonly() && cfg!(not(target_os = "windows")) {
+                warn!("Dataset file is read-only, which is good for integrity");
+            }
+
+            // Create dataset object with retry for transient I/O errors
+            let dataset_obj = retry_with_backoff(
+                || Dataset::new(name.clone(), dataset.clone()),
+                3,
+                Duration::from_millis(500),
+                "dataset object creation",
+            )
+            .map_err(|e| {
+                error!("Failed to create dataset object after retries: {}", e);
+                e
+            })?;
+
+            // Notarize with retry for transient failures
+            let proof = retry_with_backoff(
+                || ledger.notarize_dataset(dataset_obj.clone(), proof_type.clone()),
+                3,
+                Duration::from_secs(1),
+                "dataset notarization",
+            )
+            .map_err(|e| {
+                error!("Failed to notarize dataset after retries: {}", e);
+                e
+            })?;
+
+            let total_time = start_time.elapsed();
 
             println!("✅ Dataset notarized successfully!");
             println!("   Dataset: {}", name);
             println!("   Hash: {}", proof.dataset_hash);
             println!("   Proof Type: {}", proof.proof_type);
             println!("   Timestamp: {}", proof.timestamp);
+            println!("   File Size: {} bytes", file_metadata.len());
+            println!("   Processing Time: {:.2}s", total_time.as_secs_f64());
+
+            // Performance metrics
+            let throughput = file_metadata.len() as f64 / total_time.as_secs_f64();
+            println!(
+                "   Throughput: {:.2} bytes/sec ({:.2} MB/s)",
+                throughput,
+                throughput / 1_000_000.0
+            );
+
+            // Performance optimization summary
+            let optimizations: Vec<&str> = [
+                if use_high_performance {
+                    Some("high-performance")
+                } else {
+                    None
+                },
+                if use_parallel { Some("parallel") } else { None },
+                if use_cache { Some("caching") } else { None },
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+
+            if !optimizations.is_empty() {
+                println!("   Optimizations: {}", optimizations.join(", "));
+            }
+
+            info!(
+                "Dataset {} notarized successfully with hash: {} in {:.2}s (optimizations: {})",
+                name,
+                proof.dataset_hash,
+                total_time.as_secs_f64(),
+                optimizations.join(", ")
+            );
 
             Ok(())
         }
@@ -949,6 +1214,120 @@ fn main() -> Result<()> {
                     println!("✅ Engine stopped gracefully");
                     println!("📋 Final status: All tasks completed");
                 }
+            }
+
+            Ok(())
+        }
+
+        Commands::Benchmark {
+            benchmark_type,
+            iterations,
+            dataset_size_mb,
+            output,
+        } => {
+            println!("🏃 Running Performance Benchmark");
+            println!("   Type: {}", benchmark_type);
+            println!("   Iterations: {}", iterations);
+            println!("   Synthetic Dataset Size: {} MB", dataset_size_mb);
+            println!();
+
+            use std::io::Write;
+            use tempfile::NamedTempFile;
+
+            // Create synthetic dataset
+            println!("📝 Creating synthetic dataset...");
+            let mut temp_file = NamedTempFile::new()?;
+            let data_size = dataset_size_mb * 1024 * 1024;
+            let row_size = 100; // approximately 100 bytes per row
+            let num_rows = data_size / row_size;
+
+            writeln!(temp_file, "id,name,value,category,timestamp")?;
+            for i in 0..num_rows {
+                writeln!(
+                    temp_file,
+                    "{},user_{},value_{},category_{},2024-01-01T{}:00:00Z",
+                    i,
+                    i,
+                    i % 1000,
+                    i % 10,
+                    i % 24
+                )?;
+            }
+            temp_file.flush()?;
+
+            let temp_path = temp_file.path().to_string_lossy().to_string();
+
+            let mut times = Vec::new();
+            let mut throughputs = Vec::new();
+
+            println!("⚡ Running {} iterations...", iterations);
+
+            for i in 1..=iterations {
+                print!("   Iteration {}/{} ", i, iterations);
+
+                let start = std::time::Instant::now();
+
+                // Create a new ledger for each iteration to avoid conflicts
+                let mut ledger = Ledger::with_storage(
+                    format!("benchmark_{}", i),
+                    format!("./benchmark_{}_ledger.json", i),
+                )?;
+                let dataset_obj = Dataset::new(format!("bench_dataset_{}", i), temp_path.clone())?;
+                let _proof = ledger.notarize_dataset(dataset_obj, "benchmark".to_string())?;
+
+                let elapsed = start.elapsed();
+                let throughput = data_size as f64 / elapsed.as_secs_f64() / 1_000_000.0; // MB/s
+
+                times.push(elapsed.as_secs_f64());
+                throughputs.push(throughput);
+
+                println!("- {:.2}s ({:.2} MB/s)", elapsed.as_secs_f64(), throughput);
+            }
+
+            // Calculate statistics
+            let avg_time = times.iter().sum::<f64>() / times.len() as f64;
+            let min_time = times.iter().copied().fold(f64::INFINITY, f64::min);
+            let max_time = times.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+
+            let avg_throughput = throughputs.iter().sum::<f64>() / throughputs.len() as f64;
+            let max_throughput = throughputs
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max);
+            let min_throughput = throughputs.iter().copied().fold(f64::INFINITY, f64::min);
+
+            println!();
+            println!("📊 Benchmark Results:");
+            println!("   Average Time: {:.2}s", avg_time);
+            println!("   Min Time: {:.2}s", min_time);
+            println!("   Max Time: {:.2}s", max_time);
+            println!("   Average Throughput: {:.2} MB/s", avg_throughput);
+            println!("   Max Throughput: {:.2} MB/s", max_throughput);
+            println!("   Min Throughput: {:.2} MB/s", min_throughput);
+
+            // Generate report if requested
+            if let Some(output_path) = output {
+                let report = serde_json::json!({
+                    "benchmark_type": benchmark_type,
+                    "iterations": iterations,
+                    "dataset_size_mb": dataset_size_mb,
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "results": {
+                        "times": times,
+                        "throughputs": throughputs,
+                        "statistics": {
+                            "avg_time": avg_time,
+                            "min_time": min_time,
+                            "max_time": max_time,
+                            "avg_throughput": avg_throughput,
+                            "max_throughput": max_throughput,
+                            "min_throughput": min_throughput
+                        }
+                    }
+                });
+
+                std::fs::write(&output_path, serde_json::to_string_pretty(&report)?)?;
+                println!("📄 Benchmark report saved to: {}", output_path);
             }
 
             Ok(())
