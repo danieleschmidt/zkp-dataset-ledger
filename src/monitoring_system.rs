@@ -85,9 +85,17 @@ impl PerformanceMetrics {
     }
 }
 
-/// Health status for different system components
+/// Health status enumeration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
+}
+
+/// Health information for different system components
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HealthStatus {
+pub struct HealthInfo {
     /// Overall health status
     pub healthy: bool,
     /// Component name
@@ -102,7 +110,7 @@ pub struct HealthStatus {
     pub uptime_seconds: u64,
 }
 
-impl HealthStatus {
+impl HealthInfo {
     pub fn new(component: &str) -> Self {
         Self {
             healthy: true,
@@ -125,11 +133,11 @@ impl HealthStatus {
 /// Simple monitoring system
 pub struct MonitoringSystem {
     /// System start time
-    start_time: Instant,
+    pub start_time: Instant,
     /// Performance metrics by operation
     performance_metrics: Arc<Mutex<HashMap<String, PerformanceMetrics>>>,
     /// System health status by component
-    health_status: Arc<Mutex<HashMap<String, HealthStatus>>>,
+    health_status: Arc<Mutex<HashMap<String, HealthInfo>>>,
 }
 
 impl MonitoringSystem {
@@ -152,7 +160,7 @@ impl MonitoringSystem {
     /// Register a new component for monitoring
     pub fn register_component(&self, component: &str) {
         let mut health = self.health_status.lock().unwrap();
-        health.insert(component.to_string(), HealthStatus::new(component));
+        health.insert(component.to_string(), HealthInfo::new(component));
     }
 
     /// Record performance measurement for an operation
@@ -216,7 +224,7 @@ impl MonitoringSystem {
     }
 
     /// Get overall system health
-    pub fn system_health(&self) -> HealthStatus {
+    pub fn system_health(&self) -> HealthInfo {
         let health = self.health_status.lock().unwrap();
 
         let overall_score = if health.is_empty() {
@@ -225,7 +233,7 @@ impl MonitoringSystem {
             health.values().map(|h| h.health_score).sum::<f64>() / health.len() as f64
         };
 
-        HealthStatus {
+        HealthInfo {
             healthy: overall_score > 0.8,
             component: "system".to_string(),
             health_score: overall_score,
