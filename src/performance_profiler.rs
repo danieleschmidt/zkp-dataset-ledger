@@ -6,13 +6,18 @@
 use crate::{LedgerError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex, atomic::{AtomicU64, Ordering}};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 use std::time::{Duration, Instant};
 
 /// Performance profiler for comprehensive analysis
 pub struct PerformanceProfiler {
     profiles: Arc<Mutex<HashMap<String, ProfileData>>>,
+    #[allow(dead_code)]
     sampling_rate: Duration,
+    #[allow(dead_code)]
     max_samples: usize,
     active_traces: Arc<Mutex<HashMap<String, TraceContext>>>,
     metrics: Arc<PerformanceMetrics>,
@@ -23,9 +28,13 @@ pub struct PerformanceProfiler {
 pub struct ProfileData {
     pub operation: String,
     pub total_executions: u64,
+    #[serde(skip)]
     pub total_time: Duration,
+    #[serde(skip)]
     pub average_time: Duration,
+    #[serde(skip)]
     pub min_time: Duration,
+    #[serde(skip)]
     pub max_time: Duration,
     pub percentiles: Percentiles,
     pub memory_usage: MemoryProfile,
@@ -38,10 +47,15 @@ pub struct ProfileData {
 /// Performance percentiles for detailed analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Percentiles {
+    #[serde(skip)]
     pub p50: Duration,
+    #[serde(skip)]
     pub p75: Duration,
+    #[serde(skip)]
     pub p90: Duration,
+    #[serde(skip)]
     pub p95: Duration,
+    #[serde(skip)]
     pub p99: Duration,
 }
 
@@ -58,8 +72,11 @@ pub struct MemoryProfile {
 /// CPU profiling data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpuProfile {
+    #[serde(skip)]
     pub total_cpu_time: Duration,
+    #[serde(skip)]
     pub user_time: Duration,
+    #[serde(skip)]
     pub system_time: Duration,
     pub context_switches: u64,
     pub cache_misses: u64,
@@ -121,21 +138,31 @@ pub enum ConfidenceLevel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImplementationComplexity {
-    Simple,     // < 1 day
-    Moderate,   // 1-3 days
-    Complex,    // 1-2 weeks
-    Extensive,  // > 2 weeks
+    Simple,    // < 1 day
+    Moderate,  // 1-3 days
+    Complex,   // 1-2 weeks
+    Extensive, // > 2 weeks
 }
 
 /// Individual performance sample
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileSample {
     pub timestamp: std::time::SystemTime,
+    #[serde(skip, default = "default_duration")]
     pub duration: Duration,
     pub memory_delta: i64,
     pub cpu_percentage: f64,
+    #[serde(skip, default = "default_thread_id")]
     pub thread_id: std::thread::ThreadId,
     pub call_stack: Vec<String>,
+}
+
+fn default_duration() -> Duration {
+    Duration::from_secs(0)
+}
+
+fn default_thread_id() -> std::thread::ThreadId {
+    std::thread::current().id()
 }
 
 /// Memory leak detection
@@ -162,10 +189,16 @@ pub struct TraceContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Span {
     pub name: String,
+    #[serde(skip, default = "default_instant")]
     pub start_time: Instant,
+    #[serde(skip, default)]
     pub end_time: Option<Instant>,
     pub tags: HashMap<String, String>,
     pub events: Vec<SpanEvent>,
+}
+
+fn default_instant() -> Instant {
+    Instant::now()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +217,12 @@ pub struct PerformanceMetrics {
     pub memory_allocations: AtomicU64,
     pub cache_hits: AtomicU64,
     pub cache_misses: AtomicU64,
+}
+
+impl Default for PerformanceProfiler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PerformanceProfiler {
@@ -208,7 +247,7 @@ impl PerformanceProfiler {
     /// Start profiling an operation
     pub fn start_trace(&self, operation: &str) -> Result<String> {
         let trace_id = uuid::Uuid::new_v4().to_string();
-        
+
         let trace_context = TraceContext {
             trace_id: trace_id.clone(),
             operation: operation.to_string(),
@@ -219,8 +258,9 @@ impl PerformanceProfiler {
         };
 
         {
-            let mut traces = self.active_traces.lock()
-                .map_err(|e| LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e)))?;
+            let mut traces = self.active_traces.lock().map_err(|e| {
+                LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e))
+            })?;
             traces.insert(trace_id.clone(), trace_context);
         }
 
@@ -231,17 +271,23 @@ impl PerformanceProfiler {
     /// End profiling and collect results
     pub fn end_trace(&self, trace_id: &str) -> Result<ProfileData> {
         let trace_context = {
-            let mut traces = self.active_traces.lock()
-                .map_err(|e| LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e)))?;
-            traces.remove(trace_id)
+            let mut traces = self.active_traces.lock().map_err(|e| {
+                LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e))
+            })?;
+            traces
+                .remove(trace_id)
                 .ok_or_else(|| LedgerError::NotFound(format!("Trace not found: {}", trace_id)))?
         };
 
         self.metrics.active_traces.fetch_sub(1, Ordering::Relaxed);
 
         let total_time = trace_context.start_time.elapsed();
-        self.metrics.total_operations.fetch_add(1, Ordering::Relaxed);
-        self.metrics.total_execution_time.fetch_add(total_time.as_nanos() as u64, Ordering::Relaxed);
+        self.metrics
+            .total_operations
+            .fetch_add(1, Ordering::Relaxed);
+        self.metrics
+            .total_execution_time
+            .fetch_add(total_time.as_nanos() as u64, Ordering::Relaxed);
 
         // Create profile sample
         let sample = ProfileSample {
@@ -255,12 +301,14 @@ impl PerformanceProfiler {
 
         // Update or create profile data
         let profile_data = {
-            let mut profiles = self.profiles.lock()
-                .map_err(|e| LedgerError::ConcurrencyError(format!("Failed to acquire profile lock: {}", e)))?;
-            
-            let profile = profiles.entry(trace_context.operation.clone())
+            let mut profiles = self.profiles.lock().map_err(|e| {
+                LedgerError::ConcurrencyError(format!("Failed to acquire profile lock: {}", e))
+            })?;
+
+            let profile = profiles
+                .entry(trace_context.operation.clone())
                 .or_insert_with(|| ProfileData::new(&trace_context.operation));
-            
+
             profile.add_sample(sample, total_time);
             profile.clone()
         };
@@ -270,9 +318,10 @@ impl PerformanceProfiler {
 
     /// Create performance span within trace
     pub fn create_span(&self, trace_id: &str, span_name: &str) -> Result<()> {
-        let mut traces = self.active_traces.lock()
-            .map_err(|e| LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e)))?;
-        
+        let mut traces = self.active_traces.lock().map_err(|e| {
+            LedgerError::ConcurrencyError(format!("Failed to acquire trace lock: {}", e))
+        })?;
+
         if let Some(trace) = traces.get_mut(trace_id) {
             let span = Span {
                 name: span_name.to_string(),
@@ -289,8 +338,9 @@ impl PerformanceProfiler {
 
     /// Get comprehensive performance report
     pub fn generate_report(&self) -> Result<PerformanceReport> {
-        let profiles = self.profiles.lock()
-            .map_err(|e| LedgerError::ConcurrencyError(format!("Failed to acquire profile lock: {}", e)))?;
+        let profiles = self.profiles.lock().map_err(|e| {
+            LedgerError::ConcurrencyError(format!("Failed to acquire profile lock: {}", e))
+        })?;
 
         let mut operation_profiles = Vec::new();
         let mut global_bottlenecks = Vec::new();
@@ -312,7 +362,7 @@ impl PerformanceProfiler {
             timestamp: std::time::SystemTime::now(),
             total_operations: self.metrics.total_operations.load(Ordering::Relaxed),
             total_execution_time: Duration::from_nanos(
-                self.metrics.total_execution_time.load(Ordering::Relaxed)
+                self.metrics.total_execution_time.load(Ordering::Relaxed),
             ),
             operation_profiles,
             global_bottlenecks,
@@ -330,7 +380,8 @@ impl PerformanceProfiler {
         let mut bottlenecks = Vec::new();
 
         // Analyze memory usage patterns
-        let high_memory_ops: Vec<_> = profiles.iter()
+        let high_memory_ops: Vec<_> = profiles
+            .iter()
             .filter(|p| p.memory_usage.peak_usage > 100 * 1024 * 1024) // > 100MB
             .collect();
 
@@ -339,7 +390,7 @@ impl PerformanceProfiler {
                 location: "Cross-operation memory usage".to_string(),
                 severity: BottleneckSeverity::High,
                 description: format!(
-                    "{} operations using > 100MB memory simultaneously", 
+                    "{} operations using > 100MB memory simultaneously",
                     high_memory_ops.len()
                 ),
                 impact_percentage: 25.0,
@@ -348,7 +399,8 @@ impl PerformanceProfiler {
         }
 
         // Analyze CPU contention
-        let cpu_intensive_ops: Vec<_> = profiles.iter()
+        let cpu_intensive_ops: Vec<_> = profiles
+            .iter()
             .filter(|p| p.cpu_profile.total_cpu_time > Duration::from_secs(5))
             .collect();
 
@@ -366,7 +418,10 @@ impl PerformanceProfiler {
     }
 
     /// Generate system-wide optimization suggestions
-    fn generate_system_optimizations(&self, profiles: &[ProfileData]) -> Vec<OptimizationSuggestion> {
+    fn generate_system_optimizations(
+        &self,
+        profiles: &[ProfileData],
+    ) -> Vec<OptimizationSuggestion> {
         let mut suggestions = Vec::new();
 
         // Analyze proof generation performance
@@ -400,11 +455,10 @@ async fn generate_proof_parallel(circuits: &[Circuit]) -> Result<Proof> {
         }
 
         // Memory optimization suggestions
-        let total_memory_usage: u64 = profiles.iter()
-            .map(|p| p.memory_usage.peak_usage)
-            .sum();
+        let total_memory_usage: u64 = profiles.iter().map(|p| p.memory_usage.peak_usage).sum();
 
-        if total_memory_usage > 1024 * 1024 * 1024 { // > 1GB
+        if total_memory_usage > 1024 * 1024 * 1024 {
+            // > 1GB
             suggestions.push(OptimizationSuggestion {
                 category: OptimizationCategory::Memory,
                 title: "Implement Memory Pooling".to_string(),
@@ -463,7 +517,7 @@ impl CryptoMemoryPool {
     fn calculate_cache_hit_rate(&self) -> f64 {
         let hits = self.metrics.cache_hits.load(Ordering::Relaxed) as f64;
         let misses = self.metrics.cache_misses.load(Ordering::Relaxed) as f64;
-        
+
         if hits + misses == 0.0 {
             0.0
         } else {
@@ -534,7 +588,7 @@ impl ProfileData {
         self.total_executions += 1;
         self.total_time += duration;
         self.average_time = self.total_time / self.total_executions as u32;
-        
+
         if duration < self.min_time {
             self.min_time = duration;
         }
@@ -550,10 +604,10 @@ impl ProfileData {
 
         // Update percentiles
         self.update_percentiles();
-        
+
         // Analyze for bottlenecks
         self.analyze_bottlenecks();
-        
+
         // Generate optimization suggestions
         self.generate_optimizations();
     }
@@ -564,9 +618,7 @@ impl ProfileData {
             return;
         }
 
-        let mut durations: Vec<Duration> = self.samples.iter()
-            .map(|s| s.duration)
-            .collect();
+        let mut durations: Vec<Duration> = self.samples.iter().map(|s| s.duration).collect();
         durations.sort();
 
         let len = durations.len();
@@ -614,12 +666,15 @@ impl ProfileData {
         }
 
         let mean = self.average_time.as_secs_f64();
-        let variance: f64 = self.samples.iter()
+        let variance: f64 = self
+            .samples
+            .iter()
             .map(|s| {
                 let diff = s.duration.as_secs_f64() - mean;
                 diff * diff
             })
-            .sum::<f64>() / self.samples.len() as f64;
+            .sum::<f64>()
+            / self.samples.len() as f64;
 
         variance.sqrt() / mean // Coefficient of variation
     }
@@ -632,7 +687,8 @@ impl ProfileData {
             self.optimization_suggestions.push(OptimizationSuggestion {
                 category: OptimizationCategory::Cryptography,
                 title: "Optimize Proof Generation".to_string(),
-                description: "Proof generation time is high. Consider circuit optimization.".to_string(),
+                description: "Proof generation time is high. Consider circuit optimization."
+                    .to_string(),
                 expected_improvement: ExpectedImprovement {
                     performance_gain_percentage: 35.0,
                     memory_reduction_percentage: 5.0,
@@ -652,11 +708,11 @@ mod tests {
     #[tokio::test]
     async fn test_performance_profiler() {
         let profiler = PerformanceProfiler::new();
-        
+
         let trace_id = profiler.start_trace("test_operation").unwrap();
         tokio::time::sleep(Duration::from_millis(10)).await;
         let profile = profiler.end_trace(&trace_id).unwrap();
-        
+
         assert_eq!(profile.operation, "test_operation");
         assert!(profile.total_executions > 0);
     }
@@ -664,7 +720,7 @@ mod tests {
     #[test]
     fn test_profile_data_analysis() {
         let mut profile = ProfileData::new("test_op");
-        
+
         let sample = ProfileSample {
             timestamp: std::time::SystemTime::now(),
             duration: Duration::from_millis(100),

@@ -46,6 +46,10 @@ pub enum LedgerError {
     ServiceUnavailable(String),
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+    #[error("Circuit breaker open for operation: {0}")]
+    CircuitBreakerOpen(String),
+    #[error("Maximum retries exceeded")]
+    MaxRetriesExceeded,
 }
 
 impl LedgerError {
