@@ -131,6 +131,7 @@ impl HealthInfo {
 }
 
 /// Simple monitoring system
+#[derive(Debug)]
 pub struct MonitoringSystem {
     /// System start time
     pub start_time: Instant,

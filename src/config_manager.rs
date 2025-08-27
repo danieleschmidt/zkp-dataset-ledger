@@ -118,6 +118,7 @@ impl Default for GlobalConfig {
 }
 
 /// Configuration manager with environment variable and file support
+#[derive(Debug)]
 pub struct ConfigManager {
     config: GlobalConfig,
     config_sources: Vec<String>,

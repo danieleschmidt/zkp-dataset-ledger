@@ -1,0 +1,14 @@
+{
+  "27273bf3-c809-495f-8d57-d14aac0a1fa9": {
+    "id": "27273bf3-c809-495f-8d57-d14aac0a1fa9",
+    "dataset_name": "bench_dataset_8",
+    "dataset_hash": "7315ee095a5fabdfd7d1321054d2cf1a452bbaed804820230361cd9ab45201e7",
+    "operation": "notarize(benchmark)",
+    "proof": {
+      "dataset_hash": "7315ee095a5fabdfd7d1321054d2cf1a452bbaed804820230361cd9ab45201e7",
+      "proof_type": "benchmark",
+      "timestamp": "2025-08-27T16:01:00.577434484Z"
+    },
+    "timestamp": "2025-08-27T16:01:00.577442552Z"
+  }
+}

@@ -157,6 +157,7 @@ pub enum CacheLayer {
 }
 
 /// High-performance concurrent cache implementation
+#[derive(Debug)]
 pub struct PerformanceCache<T>
 where
     T: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync,
@@ -478,6 +479,7 @@ fn current_timestamp() -> u64 {
 }
 
 /// Cache manager for different data types
+#[derive(Debug)]
 pub struct CacheManager {
     /// Dataset cache
     dataset_cache: Arc<PerformanceCache<crate::Dataset>>,

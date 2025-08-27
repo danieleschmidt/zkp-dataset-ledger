@@ -173,6 +173,7 @@ impl Default for ConcurrentConfig {
 }
 
 /// High-performance concurrent processing engine
+#[derive(Debug)]
 pub struct ConcurrentEngine {
     config: ConcurrentConfig,
     metrics: Arc<ConcurrentMetrics>,
