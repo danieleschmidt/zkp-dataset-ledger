@@ -1,3 +1,4 @@
+```rust
 //! Production Orchestrator - Enterprise-grade deployment coordination
 //!
 //! This module provides production-ready deployment orchestration, health monitoring,
@@ -5,10 +6,10 @@
 
 use crate::{
     cache_system::CacheManager,
-    concurrent_engine::{ConcurrentConfig, ConcurrentEngine},
+    concurrent_engine::{ConcurrentConfig, ConcurrentEngine, TaskPriority},
     config_manager::ConfigManager,
     monitoring_system::{HealthStatus, MonitoringSystem},
-    Result,
+    LedgerError, Result,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
 
 /// Production deployment configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,6 +85,7 @@ pub struct DisasterRecoveryConfig {
 }
 
 /// Production orchestrator for enterprise deployments
+#[derive(Debug)]
 pub struct ProductionOrchestrator {
     config: ProductionConfig,
     #[allow(dead_code)]
@@ -136,6 +138,7 @@ pub struct ProductionMetrics {
 }
 
 /// Health checking system for production environments
+#[derive(Debug)]
 pub struct HealthChecker {
     config: HealthCheckConfig,
     checks: DashMap<HealthCheckType, HealthCheckResult>,
@@ -164,7 +167,7 @@ impl ProductionOrchestrator {
 
         let engine = Arc::new(ConcurrentEngine::new(concurrent_config));
         let monitoring = Arc::new(MonitoringSystem::new());
-        let cache = Arc::new(CacheManager::new()); // Default cache
+        let cache = Arc::new(CacheManager::new()); // Default cache configuration
         let config_manager = Arc::new(ConfigManager::load_with_env()?);
 
         let health_checker = Arc::new(HealthChecker::new(config.health_checks.clone()));
@@ -526,3 +529,4 @@ mod tests {
         assert!(matches!(result.status, HealthStatus::Healthy));
     }
 }
+```

@@ -83,3 +83,15 @@ pub mod intelligent_caching;
 pub mod deployment_manager;
 pub mod performance_profiler;
 pub mod production_orchestrator;
+
+// Quantum Performance Optimization (Generation 3 - Advanced)
+pub mod quantum_performance;
+pub mod autonomous_orchestration;
+
+// Re-export quantum-level features
+pub use quantum_performance::{
+    QuantumPerformanceEngine, QuantumPerformanceMetrics, ScalingConfig, PerformancePrediction,
+};
+pub use autonomous_orchestration::{
+    AutonomousOrchestrator, OrchestrationConfig, OrchestrationStatus, AutomationScope,
+};
