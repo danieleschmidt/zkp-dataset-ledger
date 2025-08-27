@@ -3,6 +3,75 @@
 
 // Test modules
 mod fixtures;
+
+// Quantum performance and autonomous orchestration tests
+mod quantum_performance_tests {
+    use zkp_dataset_ledger::*;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_autonomous_orchestrator_creation() {
+        let config = OrchestrationConfig::default();
+        let performance_engine = Arc::new(
+            QuantumPerformanceEngine::new(ScalingConfig::default())
+        );
+
+        let result = AutonomousOrchestrator::new(config, performance_engine).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_quantum_performance_engine() {
+        let config = ScalingConfig::default();
+        let engine = QuantumPerformanceEngine::new(config);
+
+        // Test initialization
+        let metrics = engine.get_metrics();
+        assert_eq!(metrics.processed_operations, 0);
+        assert_eq!(metrics.average_response_time_ms, 0.0);
+        assert_eq!(metrics.throughput_ops_per_sec, 0);
+
+        // Verify metrics are in expected ranges
+        assert!(metrics.cpu_utilization >= 0.0 && metrics.cpu_utilization <= 1.0);
+        assert!(metrics.cache_efficiency >= 0.0 && metrics.cache_efficiency <= 1.0);
+        assert!(metrics.predictive_accuracy >= 0.0 && metrics.predictive_accuracy <= 1.0);
+    }
+
+    #[test]
+    fn test_automation_scope_hierarchy() {
+        use std::mem::discriminant;
+        
+        let conservative = AutomationScope::Conservative;
+        let moderate = AutomationScope::Moderate;
+        let aggressive = AutomationScope::Aggressive;
+        let full = AutomationScope::Full;
+        
+        // Test that each scope is distinct
+        assert_ne!(discriminant(&conservative), discriminant(&moderate));
+        assert_ne!(discriminant(&moderate), discriminant(&aggressive));
+        assert_ne!(discriminant(&aggressive), discriminant(&full));
+    }
+
+    #[test]
+    fn test_metrics_serialization() {
+        let metrics = QuantumPerformanceMetrics {
+            processed_operations: 1000,
+            average_response_time_ms: 50.0,
+            throughput_ops_per_sec: 100,
+            cpu_utilization: 0.75,
+            memory_usage_mb: 512,
+            active_connections: 25,
+            cache_efficiency: 0.85,
+            predictive_accuracy: 0.90,
+        };
+
+        // Test JSON serialization
+        let json = serde_json::to_string(&metrics).expect("Failed to serialize metrics");
+        assert!(json.contains("processed_operations"));
+        assert!(json.contains("1000"));
+    }
+}
 // Temporarily disabled until APIs are aligned
 // mod integration;
 // mod performance;

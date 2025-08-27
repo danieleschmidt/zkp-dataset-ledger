@@ -15,7 +15,9 @@ pub use error_handling::{
     ContextualError, ErrorCategory, ErrorContext, ErrorHandler, ErrorSeverity,
 };
 pub use lib_simple::*;
-pub use monitoring_system::{HealthInfo, HealthStatus, MonitoringSystem, PerformanceMetrics, SystemMetrics};
+pub use monitoring_system::{
+    HealthInfo, HealthStatus, MonitoringSystem, PerformanceMetrics, SystemMetrics,
+};
 
 // Advanced cryptographic modules (Generation 1-3 enhancements)
 pub mod advanced_ledger;
@@ -50,3 +52,15 @@ pub mod monitoring_system;
 pub mod deployment_manager;
 pub mod performance_profiler;
 pub mod production_orchestrator;
+
+// Quantum Performance Optimization (Generation 3 - Advanced)
+pub mod quantum_performance;
+pub mod autonomous_orchestration;
+
+// Re-export quantum-level features
+pub use quantum_performance::{
+    QuantumPerformanceEngine, QuantumPerformanceMetrics, ScalingConfig, PerformancePrediction,
+};
+pub use autonomous_orchestration::{
+    AutonomousOrchestrator, OrchestrationConfig, OrchestrationStatus, AutomationScope,
+};
