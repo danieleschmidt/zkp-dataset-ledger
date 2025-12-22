@@ -29,7 +29,7 @@ ark-serialize = "0.5"
 ark-ff = "0.5"
 ark-ec = "0.5"
 ark-std = "0.5"
-bincode = "2.0"
+bincode = "3.0"
 # Additional math dependencies
 libm = "0.2"
 # Logging and monitoring
