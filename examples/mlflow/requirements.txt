@@ -1,9 +1,0 @@
-# MLflow integration example requirements
-mlflow>=2.9.0
-pandas>=1.5.0
-scikit-learn>=1.3.0
-numpy>=1.24.0
-
-# For ZKP Dataset Ledger Python bindings
-# Uncomment when Python bindings are published:
-# zkp-dataset-ledger>=0.1.0

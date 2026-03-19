@@ -1,97 +1,67 @@
-// ZKP Dataset Ledger - Main Library Entry Point
-//
-// This library provides cryptographic provenance for ML pipelines using zero-knowledge proofs.
-// It implements a secure, auditable ledger for dataset operations and transformations.
+//! # ZKP Dataset Ledger
+//!
+//! A zero-knowledge proof system for ML dataset provenance.
+//!
+//! ## Core Concept
+//!
+//! When training ML models, data owners need to prove properties about their training
+//! data to third parties (auditors, regulators, model consumers) WITHOUT revealing the
+//! actual dataset. This is the dataset provenance problem.
+//!
+//! This library implements two cryptographic primitives to address it:
+//!
+//! ### 1. Hash Commitment Scheme
+//!
+//! A Pedersen-style commitment: `C = Hash(dataset_content || blinding_factor)`
+//!
+//! - The prover commits to dataset properties by publishing the commitment hash
+//! - The prover can later reveal selected properties with a proof
+//! - The verifier learns nothing about the dataset beyond what's explicitly proven
+//!
+//! ### 2. Schnorr-Style Sigma Protocol (Non-Interactive via Fiat-Shamir)
+//!
+//! Proves "I know a secret x such that H = hash(x)" without revealing x.
+//! Applied here: "I know dataset D such that commitment = hash(D || nonce)".
+//!
+//! The Fiat-Shamir heuristic converts the interactive proof to non-interactive
+//! by replacing the verifier's random challenge with a hash of the transcript.
+//!
+//! ## Why This Matters for ML
+//!
+//! - **Data sovereignty**: Dataset owners can prove training compliance without sharing data
+//! - **Regulatory audit**: Prove GDPR compliance, bias metrics, data provenance
+//! - **Supply chain security**: Cryptographic chain of custody for model ingredients
+//! - **Federated learning**: Each party can prove their contribution without revealing it
 
-// Generation 1-3 SDLC Implementation - Progressive Enhancement Complete
+pub mod commitment;
+pub mod crypto;
+pub mod ledger;
+pub mod proof;
 
-// Core simple implementation (Generation 1 - MAKE IT WORK)
-pub use cache_system::{CacheManager, CacheStats, PerformanceCache};
-pub use concurrent_engine::{
-    BatchProcessor, ConcurrentEngine, ExecutionContext, ParallelProofGenerator, TaskPriority,
-};
-pub use config_manager::{ConfigManager, GlobalConfig};
-pub use error_handling::{
-    ContextualError, ErrorCategory, ErrorContext, ErrorHandler, ErrorSeverity,
-};
-pub use lib_simple::*;
-pub use monitoring_system::{
-    HealthInfo, HealthStatus, MonitoringSystem, PerformanceMetrics, SystemMetrics,
-};
+pub use commitment::{DatasetCommitment, CommitmentConfig};
+pub use ledger::{DatasetLedger, LedgerEntry};
+pub use proof::{DatasetProof, ProofType, ProofVerifier};
 
-// Advanced cryptographic modules (Generation 1-3 enhancements)
-pub mod advanced_ledger;
-pub mod distributed_consensus;
-// pub mod research;  // Temporarily disabled for compilation
-pub mod security_enhanced;
-pub mod zkp_circuits;
+/// Core error type
+#[derive(Debug, thiserror::Error)]
+pub enum LedgerError {
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 
-// Re-export advanced features for production use
-pub use zkp_circuits::{
-    DatasetIntegrityCircuit, DifferentialPrivacyCircuit, StatisticalBounds,
-    StatisticalPropertiesCircuit, ZkCircuitType, ZkIntegrityProof, ZkProofConfig, ZkProofSystem,
-    ZkStatisticalProof,
-};
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
 
-pub use advanced_ledger::{
-    AdvancedLedger, AdvancedLedgerEntry, AdvancedMetrics, AdvancedProof, CompositeProof,
-    ConcurrencyMetrics, LedgerMetadata, MerkleInclusionProof, MerkleTree, MultiSigProof,
-    ProofTimingMetrics, RetentionPolicy, SecurityLevel, SecurityMetrics, StorageMetrics,
-    VerificationTimingMetrics,
-};
+    #[error("Cryptographic error: {0}")]
+    Crypto(String),
 
-// Re-export Generation 2 robust features
-pub use comprehensive_logging::{
-    LogEvent, LogEventBuilder, LogLevel, LogQuery, LogValue, LoggingConfig, LoggingSystem,
-};
-pub use enhanced_validation::{
-    SecurityPolicies, ValidationEngine, ValidationResult, ValidationRule, ValidationSeverity,
-};
-pub use robust_error_recovery::{
-    CircuitBreakerState, CircuitState, ErrorRecoveryEngine, HealthChecker, RecoveryConfig,
-    RecoveryResult, RecoveryStrategy,
-};
+    #[error("Verification failed: {0}")]
+    VerificationFailed(String),
 
-// Re-export Generation 3 scaling features
-pub use adaptive_optimization::{
-    AdaptiveOptimizer, AnomalyDetection, LoadPredictor, OptimizationConfig, OptimizationMetrics,
-    PerformanceDatapoint, ResourceAllocator,
-};
-pub use intelligent_caching::{
-    AccessPredictor, CacheAnalytics, CacheConfig, CacheMetrics, DistributedCoordinator,
-    EvictionPolicy, IntelligentCache,
-};
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 
-// Core modules
-pub mod cache_system;
-pub mod concurrent_engine;
-pub mod config_manager;
-pub mod error_handling;
-mod lib_simple;
-pub mod monitoring_system;
+    #[error("Not found: {0}")]
+    NotFound(String),
+}
 
-// Generation 2 modules (MAKE IT ROBUST - Reliable)
-pub mod comprehensive_logging;
-pub mod enhanced_validation;
-pub mod robust_error_recovery;
-
-// Generation 3 modules (MAKE IT SCALE - Optimized)
-pub mod adaptive_optimization;
-pub mod intelligent_caching;
-
-// Production-grade modules (Generation 3 - MAKE IT SCALE)
-pub mod deployment_manager;
-pub mod performance_profiler;
-pub mod production_orchestrator;
-
-// Quantum Performance Optimization (Generation 3 - Advanced)
-pub mod quantum_performance;
-pub mod autonomous_orchestration;
-
-// Re-export quantum-level features
-pub use quantum_performance::{
-    QuantumPerformanceEngine, QuantumPerformanceMetrics, ScalingConfig, PerformancePrediction,
-};
-pub use autonomous_orchestration::{
-    AutonomousOrchestrator, OrchestrationConfig, OrchestrationStatus, AutomationScope,
-};
+pub type Result<T> = std::result::Result<T, LedgerError>;

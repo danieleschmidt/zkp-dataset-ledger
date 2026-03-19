@@ -1,573 +1,238 @@
-# ZKP Dataset Ledger
+# zkp-dataset-ledger
 
-[![Rust](https://img.shields.io/badge/Rust-1.75+-orange.svg)](https://www.rust-lang.org/)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Cryptography](https://img.shields.io/badge/ZKP-Groth16-green.svg)](https://github.com/arkworks-rs/groth16)
-[![Audit](https://img.shields.io/badge/Audit-Ready-brightgreen.svg)](https://zkp-dataset-ledger.org)
+> **Zero-knowledge proof ledger for ML dataset provenance**
+>
+> Prove your training data has the right properties — without revealing the data.
 
-A zero-knowledge-proof ledger that notarizes every dataset version, transformation, and train/eval split. First turnkey implementation for cryptographic ML pipeline auditing.
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-33%20passing-green)](#)
 
-## 🏗️ Architecture
+---
+
+## The Problem
+
+When training ML models, **data provenance matters**:
+
+- Regulators want to verify GDPR compliance without accessing personal data
+- Auditors want to confirm a model wasn't trained on prohibited datasets
+- Model consumers want assurance about training data quality
+- Federated learning parties want to prove their contribution without sharing it
+
+The naive solution — share the dataset — violates privacy, IP protection, and data governance.
+
+## The Solution: Zero-Knowledge Proofs
+
+A **zero-knowledge proof (ZKP)** lets you prove a statement is true *without revealing why* it's true.
+
+This library applies ZKP primitives to dataset provenance:
 
 ```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Dataset File  │────▶│ Hash & Shard │────▶│  Merkle Tree    │
-│                 │     │              │     │   Commitment    │
-└─────────────────┘     └──────────────┘     └─────────────────┘
-         │                      │                      │
-         ▼                      ▼                      ▼
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
-│ Private Inputs  │────▶│ ZK Circuit   │────▶│ Groth16 Proof   │
-│                 │     │              │     │                 │
-└─────────────────┘     └──────────────┘     └─────────────────┘
+"My training dataset has exactly 1 million rows, 
+ mean age < 40, and was collected after 2020"
+       ↓
+[ZKP proves this to an auditor]
+       ↓
+The auditor learns ONLY those facts.
+The actual dataset stays private.
 ```
 
-### Core Components
+---
 
-1. **Merkle Tree Ledger**: Append-only structure for immutability
-2. **ZK Circuits**: Prove dataset properties without revealing data
-3. **Proof Generation**: Efficient Groth16 implementation
-4. **Verification Engine**: Fast proof verification
-5. **Export Module**: Generate audit reports and model cards
+## Cryptographic Primitives
 
-## 🔐 Zero-Knowledge Proofs
+### 1. Hash Commitment Scheme (Pedersen-style)
 
-### Supported Properties
+A **commitment** binds the prover to a dataset without revealing it:
 
-```rust
-// Prove these without revealing data
-pub enum DatasetProperty {
-    RowCount,
-    ColumnCount,
-    Schema(Vec<ColumnType>),
-    UniqueValues(String),  // Column name
-    NullCount(String),
-    StatisticalMoments {
-        mean: bool,
-        variance: bool,
-        skewness: bool,
-        kurtosis: bool,
-    },
-    DistributionShape(String),
-    OutlierCount(f64),  // Threshold
-    Correlation(String, String),  // Column pairs
-}
+```
+C = SHA256("commit" || SHA256(dataset) || nonce)
 ```
 
-### Custom Circuits
+- **Binding**: The prover cannot change the dataset after publishing `C`  
+  (would require a SHA-256 collision — computationally infeasible)
+- **Hiding**: Given `C` alone, the verifier learns nothing about the dataset  
+  (the 256-bit random `nonce` acts as a blinding factor)
 
-```rust
-use zkp_dataset_ledger::circuits::{Circuit, ConstraintSystem};
+### 2. Non-Interactive Sigma Protocol (Fiat-Shamir Transform)
 
-// Define custom privacy-preserving proof
-struct FairnessCircuit {
-    // Private inputs
-    dataset: Dataset,
-    protected_attribute: String,
-    
-    // Public inputs
-    fairness_threshold: f64,
-}
+A **Sigma protocol** is a 3-round interactive proof that the prover knows a secret. The **Fiat-Shamir transform** makes it non-interactive by replacing the verifier's random challenge with a deterministic hash of the transcript:
 
-impl Circuit for FairnessCircuit {
-    fn generate_constraints(
-        &self,
-        cs: &mut ConstraintSystem,
-    ) -> Result<(), Error> {
-        // Prove demographic parity without revealing distribution
-        let group_stats = self.dataset.group_by(&self.protected_attribute);
-        
-        for (group, stats) in group_stats {
-            let parity = cs.compute_parity(stats);
-            cs.enforce_constraint(
-                parity.deviation() < self.fairness_threshold
-            );
-        }
-        
-        Ok(())
-    }
-}
+```
+challenge = SHA256("proof-v1" || commitment || proof_type || witness)
+response  = SHA256("response-v1" || nonce || challenge || dataset_hash)
 ```
 
-## 📊 Advanced Features
+The verifier checks:
+1. The challenge matches the expected transcript hash (no tampering)
+2. The claimed property is consistent with the witness
+3. All values are well-formed
 
-### Differential Privacy Integration
+**Soundness**: A cheating prover cannot forge a valid `response` without knowing the `nonce`, since that would require inverting SHA-256.
 
-```rust
-use zkp_dataset_ledger::privacy::DifferentialPrivacy;
+### 3. Tamper-Evident Ledger (Hash Chaining)
 
-// Add DP noise before proving
-let dp_config = DifferentialPrivacy {
-    epsilon: 1.0,
-    delta: 1e-5,
-    mechanism: Mechanism::Laplace,
-};
+The ledger links entries with a chain hash (similar to blockchain headers):
 
-let private_proof = ledger.notarize_with_dp(
-    dataset,
-    "sensitive-data-v1",
-    dp_config,
-    ProofConfig::high_privacy()
-)?;
+```
+Entry 0               Entry 1               Entry 2
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│ commitment₀  │      │ commitment₁  │      │ commitment₂  │
+│ proofs       │      │ proofs       │      │ proofs       │
+│ prev="genesis│ ───> │ prev=H(e₀)  │ ───> │ prev=H(e₁)  │
+└──────────────┘      └──────────────┘      └──────────────┘
 ```
 
-### Multi-Party Computation
+Modifying any entry invalidates all subsequent chain hashes.
 
-```rust
-// Multiple parties can contribute to dataset without sharing
-let mpc_ledger = ledger.enable_mpc(n_parties: 3);
+---
 
-// Party 1 adds their data shard
-let proof1 = mpc_ledger.add_party_data(
-    party_id: 1,
-    data_commitment: commitment1,
-    proof: party1_proof
-)?;
+## Provable Properties
 
-// Aggregate proofs when all parties contribute
-let combined_proof = mpc_ledger.finalize_mpc()?;
-```
+| Property | Description | Example |
+|----------|-------------|---------|
+| `Existence` | Prove the dataset exists and matches the commitment | "I have dataset D" |
+| `ExactRowCount` | Prove exactly N rows | "My dataset has 10,000 rows" |
+| `MinRowCount` | Prove at least N rows | "At least 1,000 training examples" |
+| `MaxRowCount` | Prove at most N rows | "No more than 100,000 rows" |
+| `RowCountRange` | Prove row count is in [min, max] | "Between 500 and 5,000 rows" |
+| `ColumnCount` | Prove the number of columns | "5-dimensional feature space" |
+| `SchemaFingerprint` | Prove column names match a known schema | "Same schema as reference dataset" |
+| `StatisticalBounds` | Prove mean of a column is in [a, b] | "Mean age between 25 and 65" |
+| `CommittedBefore` | Prove the dataset was committed before a timestamp | "Data collected before GDPR cutoff" |
 
-### Streaming Datasets
+---
 
-```rust
-use zkp_dataset_ledger::streaming::StreamingLedger;
-
-// Handle datasets too large for memory
-let mut stream_ledger = StreamingLedger::new(
-    chunk_size: 1_000_000,  // 1M rows per chunk
-    parallel: true
-);
-
-// Process in chunks
-stream_ledger.notarize_stream(
-    data_source: S3DataSource::new("s3://bucket/huge-dataset"),
-    on_chunk: |chunk_proof| {
-        println!("Processed chunk: {}", chunk_proof.index);
-    }
-)?;
-
-// Final proof aggregates all chunks
-let final_proof = stream_ledger.finalize()?;
-```
-
-## 🧪 Verification
-
-### CLI Verification
+## Quick Start
 
 ```bash
-# Verify single proof
-zkp-ledger verify proof.json
-
-# Verify entire audit trail
-zkp-ledger verify-chain \
-  --from dataset-v1 \
-  --to dataset-v5 \
-  --strict
-
-# Export verification report
-zkp-ledger verify-all \
-  --output verification-report.pdf \
-  --include-visualizations
-```
-
-### Programmatic Verification
-
-```rust
-// Verify proof independently
-let verifier = ProofVerifier::new();
-
-match verifier.verify(&proof) {
-    Ok(result) => {
-        println!("Proof valid: {}", result.is_valid);
-        println!("Timestamp: {}", result.timestamp);
-        println!("Dataset hash: {}", result.dataset_hash);
-    },
-    Err(e) => eprintln!("Verification failed: {}", e),
-}
-
-// Verify chain integrity
-let chain_valid = ledger.verify_chain_integrity()?;
-assert!(chain_valid);
-```
-
-## 📈 Benchmarks
-
-### Performance Metrics
-
-| Operation | Dataset Size | Proof Time | Verify Time | Proof Size |
-|-----------|-------------|------------|-------------|------------|
-| Notarize | 1M rows | 2.3s | 15ms | 288 bytes |
-| Transform | 10M rows | 8.7s | 18ms | 288 bytes |
-| Split | 100M rows | 45s | 22ms | 384 bytes |
-| Statistical | 1B rows | 3.2min | 28ms | 512 bytes |
-
-### Scalability
-
-```rust
-// Benchmark different configurations
-use zkp_dataset_ledger::benchmark::Benchmarker;
-
-let bench = Benchmarker::new();
-
-bench.run_scaling_test(
-    dataset_sizes: vec![1_000, 10_000, 100_000, 1_000_000],
-    proof_types: vec![
-        ProofType::Basic,
-        ProofType::Statistical,
-        ProofType::Privacy,
-    ]
-);
-
-bench.generate_report("benchmark-results.html");
-```
-
-## 🔧 Configuration
-
-### Ledger Configuration
-
-```toml
-# zkp-ledger.toml
-[ledger]
-name = "production-ml-pipeline"
-hash_algorithm = "sha3-256"
-proof_system = "groth16"
-compression = true
-
-[storage]
-backend = "rocksdb"  # or "postgres", "s3"
-path = "./ledger-data"
-max_size_gb = 100
-
-[proof]
-curve = "bls12-381"
-security_level = 128
-parallel_prove = true
-cache_size_mb = 1024
-
-[export]
-formats = ["json-ld", "pdf", "html"]
-include_visualizations = true
-```
-
-## 🎯 Use Cases
-
-### Regulatory Compliance
-
-```rust
-// Generate compliance report for AI Act
-let compliance_report = ledger.generate_compliance_report(
-    standard: ComplianceStandard::EUAIAct,
-    datasets: vec!["training-data", "validation-data"],
-    include_proofs: true,
-)?;
-
-// Export for auditors
-compliance_report.export("ai-act-compliance.pdf")?;
-```
-
-### ML Pipeline Integration
-
-```python
-# Integration with MLflow
-import mlflow
-from zkp_dataset_ledger import MLflowIntegration
-
-# Automatically log dataset proofs
-with mlflow.start_run():
-    # Log dataset with proof
-    proof = ledger.notarize_dataset("train.csv", "training-v1")
-    MLflowIntegration.log_dataset_proof(proof)
-    
-    # Train model
-    model = train_model(data)
-    
-    # Log model with dataset provenance
-    mlflow.sklearn.log_model(
-        model,
-        "model",
-        metadata={"dataset_proof": proof.to_dict()}
-    )
-```
-
-### Federated Learning
-
-```rust
-// Prove dataset properties across federation
-use zkp_dataset_ledger::federated::FederatedLedger;
-
-let fed_ledger = FederatedLedger::new(
-    participants: vec!["hospital-a", "hospital-b", "hospital-c"],
-    aggregation: AggregationType::SecureSum,
-);
-
-// Each participant proves their data locally
-for participant in participants {
-    let local_proof = participant.prove_dataset_properties()?;
-    fed_ledger.add_participant_proof(participant.id, local_proof)?;
-}
-
-// Aggregate proofs without sharing data
-let global_proof = fed_ledger.aggregate_proofs()?;
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Priority areas:
-- Additional ZK circuits
-- Storage backend implementations
-- Integration examples
-- Performance optimizations
-- Audit standard templates
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## 📄 Citation
-
-```bibtex
-@software{zkp_dataset_ledger,
-  title={ZKP Dataset Ledger: Cryptographic Provenance for ML Pipelines},
-  author={Daniel Schmidt},
-  year={2025},
-  url={https://github.com/danieleschmidt/zkp-dataset-ledger}
-}
-```
-
-## 🏆 Acknowledgments
-
-- Arkworks team for ZK-crypto libraries
-- The Groth16 paper authors
-- ML audit framework researchers
-
-## ⚖️ License
-
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
-
-## 🔗 Resources
-
-- [Documentation](https://zkp-dataset-ledger.readthedocs.io)
-- [ZK Proof Explorer](https://explorer.zkp-dataset-ledger.org)
-- [Integration Examples](https://github.com/zkp-dataset-ledger/examples)
-- [Audit Templates](https://github.com/zkp-dataset-ledger/templates)
-- [Discord Community](https://discord.gg/zkp-dataset)
-
-## 📧 Contact
-
-- **GitHub Issues**: Bug reports and features
-- **Security**: security@zkp-dataset-ledger.org
-- **Email**: info@zkp-dataset-ledger.org🔐 Overview
-
-New frameworks show feasibility of cryptographic proofs for AI audits, but no production tool exists. This ledger provides:
-
-- **Cryptographic notarization** of dataset operations
-- **Zero-knowledge proofs** preserving data privacy
-- **Immutable audit trail** in Merkle tree structure
-- **JSON-LD model cards** with proof metadata
-- **Rust CLI** for seamless integration
-
-## ⚡ Key Features
-
-- **Privacy-Preserving**: Prove dataset properties without revealing data
-- **Tamper-Proof**: Cryptographic guarantees against manipulation
-- **Efficient**: Groth16 proofs with fast verification
-- **Interoperable**: Export proofs for any audit framework
-- **Regulatory Ready**: Compliant with emerging AI audit standards
-
-## 📋 Requirements
-
-```bash
-# System requirements
-rust>=1.75.0
-cargo>=1.75.0
-
-# Build dependencies
-cmake>=3.16
-clang>=11.0
-pkg-config>=0.29
-
-# Optional Python bindings
-python>=3.10
-maturin>=1.5.0
-```
-
-## 🛠️ Installation
-
-### From Cargo
-
-```bash
-cargo install zkp-dataset-ledger
-```
-
-### From Source
-
-```bash
-# Clone repository
-git clone https://github.com/danieleschmidt/zkp-dataset-ledger.git
+git clone https://github.com/danieleschmidt/zkp-dataset-ledger
 cd zkp-dataset-ledger
-
-# Build release version
 cargo build --release
-
-# Install CLI
-cargo install --path .
-
-# Run tests
-cargo test --all
 ```
-
-### Python Bindings
-
-```bash
-# Install Python package
-pip install zkp-dataset-ledger
-
-# Or build from source
-maturin develop --release
-```
-
-## 🚀 Quick Start
 
 ### CLI Usage
 
 ```bash
-# Initialize ledger for project
-zkp-ledger init --project my-ml-project
+# 1. Commit to your dataset (keep the output private — it contains the nonce)
+cargo run -- commit my_training_data.csv --description "MNIST subset" --output commitment.json
 
-# Notarize dataset
-zkp-ledger notarize dataset.csv \
-  --name "training-data-v1" \
-  --hash-algorithm sha3-256
+# 2. Generate a ZK proof of a property (safe to share)
+cargo run -- prove commitment.json my_training_data.csv \
+  --property row-count=60000 \
+  --output proof.json
 
-# Record transformation
-zkp-ledger transform \
-  --input training-data-v1 \
-  --output training-data-v2 \
-  --operation "normalize,remove-outliers" \
-  --prove
+# 3. Auditor verifies the proof (no dataset needed)
+cargo run -- verify proof.json
 
-# Create train/test split with proof
-zkp-ledger split \
-  --input training-data-v2 \
-  --train-ratio 0.8 \
-  --stratify-by label \
-  --seed 42
-
-# Generate audit report
-zkp-ledger audit \
-  --from genesis \
-  --to latest \
-  --format json-ld \
-  --output model-card-audit.json
+# 4. Run the interactive demo
+cargo run -- demo
 ```
 
-### Rust API
+### Library Usage
 
 ```rust
-use zkp_dataset_ledger::{Ledger, Dataset, Proof};
+use zkp_dataset_ledger::{
+    commitment::{CommitmentConfig, DatasetCommitment},
+    proof::{ProofGenerator, ProofType, ProofVerifier},
+    ledger::DatasetLedger,
+};
 
-// Initialize ledger
-let mut ledger = Ledger::new("my-project")?;
+// Load your dataset
+let dataset = std::fs::read("training_data.csv")?;
 
-// Notarize dataset with ZK proof
-let dataset = Dataset::from_path("data.csv")?;
-let proof = ledger.notarize_dataset(
-    dataset,
-    "training-data-v1",
-    ProofConfig::default()
+// Step 1: Data owner commits
+let commitment = DatasetCommitment::commit(
+    &dataset,
+    &CommitmentConfig::default(),
+    Some("ImageNet subset v2".to_string()),
 )?;
 
-// Verify proof
-assert!(ledger.verify_proof(&proof)?);
+// Publish commitment_hash to an audit log
+println!("Public commitment: {}", commitment.commitment_hash);
 
-// Record transformation
-let transform_proof = ledger.record_transformation(
-    "training-data-v1",
-    "training-data-v2",
-    vec!["normalize", "augment"],
-    TransformProof::generate(&dataset)?
+// Step 2: Generate ZK proofs
+let proof = ProofGenerator::generate(
+    &commitment,
+    &dataset,
+    ProofType::StatisticalBounds {
+        column: "label_count".to_string(),
+        mean_min: 950.0,
+        mean_max: 1050.0,
+    },
 )?;
 
-// Query audit trail
-let history = ledger.get_dataset_history("training-data-v2")?;
-for event in history {
-    println!("{}: {}", event.timestamp, event.operation);
-}
+// Step 3: Auditor verifies (no dataset required)
+assert!(ProofVerifier::verify(&proof)?);
+
+// Step 4: Append to tamper-evident ledger
+let mut ledger = DatasetLedger::new("model-audit-trail");
+ledger.append_with_proofs(commitment, vec![proof])?;
+assert!(ledger.verify_integrity());
 ```
 
-### Python API
+---
 
-```python
-from zkp_dataset_ledger import Ledger, DatasetProof
+## Architecture
 
-# Initialize ledger
-ledger = Ledger("my-project")
-
-# Notarize with privacy-preserving proof
-proof = ledger.notarize_dataset(
-    path="data.csv",
-    name="customer-data-v1",
-    private_columns=["ssn", "email"],  # Hidden in proof
-    prove_properties={
-        "row_count": True,
-        "schema": True,
-        "statistical_properties": True
-    }
-)
-
-# Generate model card section
-model_card = ledger.generate_model_card_section(
-    dataset_name="customer-data-v1",
-    include_proofs=True,
-    format="json-ld"
-)
-
-print(f"Dataset verified: {proof.is_valid()}")
-print(f"Proof size: {proof.size_bytes()} bytes")
+```
+src/
+├── lib.rs          — Public API and module declarations
+├── crypto/
+│   └── mod.rs      — SHA-256 primitives, commitment scheme, Fiat-Shamir
+├── commitment.rs   — DatasetCommitment: commit, verify, selective disclosure
+├── proof.rs        — ProofGenerator, ProofVerifier, ProofType enum
+└── ledger.rs       — DatasetLedger: append-only log with chain integrity
 ```
 
-## 🏢 Development Status
+---
 
-### SDLC Implementation Complete
+## Security Notes
 
-This project has successfully completed a comprehensive **Three-Generation Progressive Enhancement SDLC**:
+This implementation uses **standard SHA-256** rather than elliptic curve arithmetic. It demonstrates the ZKP protocol structure clearly using familiar primitives.
 
-#### Generation 1: MAKE IT WORK ✅ 
-- Core ZKP functionality with Groth16 proofs
-- Merkle tree ledger implementation
-- CLI interface with comprehensive commands
-- Basic storage backends (RocksDB/PostgreSQL)
-- **Status**: 100% Complete
+**For production use**, consider:
 
-#### Generation 2: MAKE IT ROBUST ✅
-- Enhanced input validation with security policies
-- Comprehensive structured logging with distributed tracing
-- Robust error recovery with circuit breaker patterns
-- Health checking and monitoring systems
-- **Status**: 100% Complete
+- **Groth16** or **PLONK** circuits with BLS12-381 or BN254 curves — stronger soundness and more succinct proofs
+- **bulletproofs** — efficient range proofs without trusted setup
+- **RISC Zero** or **SP1** — general-purpose zkVM for complex statement proofs
+- The [`arkworks`](https://github.com/arkworks-rs) or [`bellman`](https://github.com/zkcrypto/bellman) Rust crates
 
-#### Generation 3: MAKE IT SCALE ✅
-- Intelligent caching with predictive algorithms
-- Adaptive optimization with ML-based performance tuning
-- Production deployment automation
-- Performance profiling and orchestration
-- **Status**: 100% Complete
+This library is intended as an educational foundation and can be extended with those primitives.
 
-### Quality Metrics
+---
 
-- **Test Coverage**: 97.4% (74/76 tests passing)
-- **Security Audit**: ✅ Passed
-- **Performance**: Sub-5s proof generation for 1M+ row datasets
-- **Memory**: Streaming support for multi-GB datasets
-- **Proof Size**: <1KB for basic operations
+## Relation to ML Governance
 
-### Production Readiness
+This work connects to the broader AI governance agenda:
 
-- ✅ Docker containerization with multi-stage builds
-- ✅ Kubernetes deployment manifests
-- ✅ Blue-green deployment automation
-- ✅ Comprehensive monitoring and alerting
-- ✅ Security hardened configurations
-- ✅ Auto-scaling and load balancing
-- ✅ Backup and disaster recovery
+| Challenge | ZKP Solution |
+|-----------|-------------|
+| "Prove this model wasn't trained on my data" | Dataset existence commitment: prove hash does/doesn't match |
+| "Prove training data meets GDPR age restrictions" | Statistical bounds proof on age column |
+| "Prove federated learning contribution" | Each party commits to their shard independently |
+| "Audit ML supply chain" | Tamper-evident ledger links dataset → model → deployment |
+| "Prove bias metrics without dataset disclosure" | Statistical bounds on protected attribute distributions |
 
-##
+**Companion reading**: "Zero-Knowledge Provenance for Knowledge Graph Construction" explores applying these primitives to knowledge graph ML pipelines.
+
+---
+
+## Running Tests
+
+```bash
+cargo test
+```
+
+**33 tests** across:
+- Cryptographic primitives (commitment scheme, Fiat-Shamir)
+- Proof generation and verification (all 9 proof types)
+- Tamper-detection (modified proofs, modified ledgers)
+- Integration workflow (end-to-end commit → prove → verify → ledger)
+- Edge cases (dishonest prover, out-of-range claims)
+
+---
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE)
